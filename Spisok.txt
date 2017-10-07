@@ -191,7 +191,7 @@ kernel
 -----------------------------------------------------------------------------
 php/mysql
 -----------------------------------------------------------------------------
-alternait
+alternatives
 -----------------------------------------------------------------------------
 ===============
 L9.MONITORING
@@ -16337,6 +16337,745 @@ GRUB. Чтобы новое ядро загружалось автоматиче
 -----------------------------------------------------------------------------
 php/mysql
 -----------------------------------------------------------------------------
+2.11.1.1 Changes Affecting Upgrades to MySQL 5.7
+-----------------------------------------------------------------------------
+https://dev.mysql.com/doc/refman/5.7/en/upgrading-from-previous-series.html
+-----------------------------------------------------------------------------
+ Before upgrading to MySQL 5.7, review the changes described in this section
+to identify upgrade issues that apply to your current MySQL installation and
+applications.
+Note
+
+In addition to the changes outlined in this section, review the Release Notes
+and other important information outlined in Before You Begin.
+
+Changes marked as either Known issue or Incompatible change are incompatibilities
+with earlier versions of MySQL, and may require your attention before you upgrade.
+Our aim is to avoid these changes, but occasionally they are necessary to correct
+problems that would be worse than an incompatibility between releases. If any
+upgrade issue applicable to your installation involves an incompatibility that
+requires special handling, follow the instructions given in the incompatibility
+description. Sometimes this involves dumping and reloading tables, or use of a
+statement such as CHECK TABLE or REPAIR TABLE.
+
+For dump and reload instructions, see Section 2.11.3, “Rebuilding or Repairing
+Tables or Indexes”. Any procedure that involves REPAIR TABLE with the USE_FRM 
+option must be done before upgrading. Use of this statement with a version of
+MySQL different from the one used to create the table (that is, using it after
+ upgrading) may damage the table. See Section 13.7.2.5, “REPAIR TABLE Syntax”.
+
+    Configuration Changes
+
+    System Table Changes
+
+    Server Changes
+
+    InnoDB Changes
+
+    SQL Changes
+
+Configuration Changes
+
+    Incompatible change: As of MySQL 5.7.12, the default --early-plugin-load
+value is empty. To load the keyring_file plugin, you must use an explicit
+--early-plugin-load option with a nonempty value.
+
+    In MySQL 5.7.11, the default --early-plugin-load value was the name of the
+keyring_file plugin library file, so that plugin was loaded by default. InnoDB
+tablespace encryption requires the keyring_file plugin to be loaded prior to
+InnoDB initialization, so this change of default --early-plugin-load value
+introduces an incompatibility for upgrades from 5.7.11 to 5.7.12 or higher.
+Administrators who have encrypted InnoDB tablespaces must take explicit action
+to ensure continued loading of the keyring_file plugin: Start the server with
+ an --early-plugin-load option that names the plugin library file. For additional
+ information, see Section 6.5.4.1, “Keyring Plugin Installation”.
+
+    Incompatible change: The INFORMATION_SCHEMA has tables that contain system 
+and status variable information (see Section 24.10, “The INFORMATION_SCHEMA 
+GLOBAL_VARIABLES and SESSION_VARIABLES Tables”, and Section 24.9, “The 
+INFORMATION_SCHEMA GLOBAL_STATUS and SESSION_STATUS Tables”). As of MySQL 5.7.6,
+ the Performance Schema also contains system and status variable tables 
+(see Section 25.11.13, “Performance Schema System Variable Tables”, and 
+Section 25.11.14, “Performance Schema Status Variable Tables”). The Performance 
+Schema tables are intended to replace the INFORMATION_SCHEMA tables, which 
+are deprecated as of MySQL 5.7.6 and will be removed in a future MySQL release.
+
+    For advice on migrating away from the INFORMATION_SCHEMA tables to
+ the Performance Schema tables, see Section 25.19, “Migrating to Performance
+ Schema System and Status Variable Tables”. To assist in the migration, you 
+can use the show_compatibility_56 system variable, which affects how system 
+and status variable information is provided by the INFORMATION_SCHEMA and
+ Performance Schema tables, and also by the SHOW VARIABLES and SHOW STATUS 
+statements. show_compatibility_56 is enabled by default in 5.7.6 and 5.7.7, 
+and disabled by default in MySQL 5.7.8.
+
+    For details about the effects of show_compatibility_56, see Section 5.1.5,
+ “Server System Variables” For better understanding, it is strongly recommended
+ that you read also these sections:
+
+        Section 25.11.13, “Performance Schema System Variable Tables”
+
+        Section 25.11.14, “Performance Schema Status Variable Tables”
+
+        Section 25.11.15.10, “Status Variable Summary Tables” 
+
+    Incompatible change: As of MySQL 5.7.6, for some Linux platforms, when MySQL
+ is installed using RPM and Debian packages, server startup and shutdown now is
+ managed using systemd rather than mysqld_safe, and mysqld_safe is not installed.
+ This may require some adjustment to the manner in which you specify server options.
+ For details, see Section 2.5.10, “Managing MySQL Server with systemd”.
+
+    Incompatible change: In MySQL 5.7.5, the executable binary version of mysql_install_db
+ is located in the bin installation directory, whereas the Perl version was located
+ in the scripts installation directory. For upgrades from an older version of MySQL, 
+you may find a version in both directories. To avoid confusion, remove the version in
+ the scripts directory. For fresh installations of MySQL 5.7.5 or later, mysql_install_db
+ is only found in the bin directory, and the scripts directory is no longer present.
+ Applications that expect to find mysql_install_db in the scripts directory should 
+be updated to look in the bin directory instead.
+
+    The location of mysql_install_db becomes less material as of MySQL 5.7.6 because 
+as of that version it is deprecated in favor of mysqld --initialize 
+(or mysqld --initialize-insecure). See Section 2.10.1.1, “Initializing the Data
+ Directory Manually Using mysqld”
+
+    Incompatible change: In MySQL 5.7.5, these SQL mode changes were made:
+
+        Strict SQL mode for transactional storage engines (STRICT_TRANS_TABLES) is
+ now enabled by default.
+
+        Implementation of the ONLY_FULL_GROUP_BY SQL mode has been made more sophisticated, 
+to no longer reject deterministic queries that previously were rejected. In consequence, 
+ONLY_FULL_GROUP_BY is now enabled by default, to prohibit nondeterministic queries
+ containing expressions not guaranteed to be uniquely determined within a group.
+
+        The changes to the default SQL mode result in a default sql_mode system variable 
+value with these modes enabled: ONLY_FULL_GROUP_BY, STRICT_TRANS_TABLES, NO_ENGINE_SUBSTITUTION.
+
+        The ONLY_FULL_GROUP_BY mode is also now included in the modes comprised by the
+ ANSI SQL mode. 
+
+    If you find that having ONLY_FULL_GROUP_BY enabled causes queries for existing 
+applications to be rejected, either of these actions should restore operation:
+
+        If it is possible to modify an offending query, do so, either so that nondeterministic
+ nonaggregated columns are functionally dependent on GROUP BY columns, or by referring to 
+nonaggregated columns using ANY_VALUE().
+
+        If it is not possible to modify an offending query (for example, if it is generated 
+by a third-party application), set the sql_mode system variable at server startup to not 
+enable ONLY_FULL_GROUP_BY. 
+
+    For more information about SQL modes and GROUP BY queries, see Section 5.1.8,
+ “Server SQL Modes”, and Section 12.19.3, “MySQL Handling of GROUP BY”. 
+
+System Table Changes
+
+    Incompatible change: The Password column of the mysql.user table was removed in MySQL
+ 5.7.6. All credentials are stored in the authentication_string column, including those 
+formerly stored in the Password column. If performing an in-place upgrade to MySQL 5.7.6 or
+later, run mysql_upgrade as directed by the in-place upgrade procedure to migrate the Password 
+column contents to the authentication_string column.
+
+    If performing a logical upgrade using a mysqldump dump file from a pre-5.7.6 MySQL 
+installation, you must observe these conditions for the mysqldump command used to generate
+ the dump file:
+
+        You must include the --add-drop-table option
+
+        You must not include the --flush-privileges option 
+
+    As outlined in the logical upgrade procedure, load the pre-5.7.6 dump file into the
+ 5.7.6 (or later) server before running mysql_upgrade. 
+
+Server Changes
+
+    Incompatible change: As of MySQL 5.7.5, support for passwords that use the older pre-4.1 
+password hashing format is removed, which involves the following changes. Applications that
+ use any feature no longer supported must be modified.
+
+        The mysql_old_password authentication plugin that used pre-4.1 password hash values
+ is removed. Accounts that use this plugin are disabled at startup and the server writes an 
+“unknown plugin” message to the error log. For instructions on upgrading accounts that use 
+this plugin, see Section 6.5.1.3, “Migrating Away from Pre-4.1 Password Hashing and the 
+mysql_old_password Plugin”.
+
+        For the old_passwords system variable, a value of 1 (produce pre-4.1 hash values) 
+is no longer permitted.
+
+        The --secure-auth option to the server and client programs is the default, but is
+ now a no-op. It is deprecated and will be removed in a future MySQL release.
+
+        The --skip-secure-auth option to the server and client programs is no longer 
+supported and using it produces an error.
+
+        The secure_auth system variable permits only a value of 1; a value of 0 is no 
+longer permitted.
+
+        The OLD_PASSWORD() function is removed. 
+
+    Incompatible change: In MySQL 5.6.6, the YEAR(2) data type was deprecated. In MySQL
+ 5.7.5, support for YEAR(2) is removed. Once you upgrade to MySQL 5.7.5 or higher, any 
+remaining YEAR(2) columns must be converted to YEAR(4) to become usable again. For 
+conversion strategies, see Section 11.3.4, “YEAR(2) Limitations and Migrating to YEAR(4)”.
+ Running mysql_upgrade after upgrading is one of the possible conversion strategies.
+
+    As of MySQL 5.7.7, CHECK TABLE ... FOR UPGRADE reports a table as needing a rebuild
+ if it contains old temporal columns in pre-5.6.4 format (TIME, DATETIME, and TIMESTAMP
+ columns without support for fractional seconds precision) and the avoid_temporal_upgrade
+ system variable is disabled. This helps mysql_upgrade to detect and upgrade tables 
+containing old temporal columns. If avoid_temporal_upgrade is enabled, FOR UPGRADE ignores
+ the old temporal columns present in the table; consequently, mysql_upgrade does not upgrade them.
+
+    As of MySQL 5.7.7, REPAIR TABLE upgrades a table if it contains old temporal columns
+ in pre-5.6.4 format and the avoid_temporal_upgrade system variable is disabled. If 
+avoid_temporal_upgrade is enabled, REPAIR TABLE ignores the old temporal columns present 
+in the table and does not upgrade them.
+
+    To check for tables that contain such temporal columns and need a rebuild, disable
+ avoid_temporal_upgrade before executing CHECK TABLE ... FOR UPGRADE.
+
+    To upgrade tables that contain such temporal columns, disable avoid_temporal_upgrade
+ before executing REPAIR TABLE or mysql_upgrade.
+
+    Incompatible change: As of MySQL 5.7.2, the server requires account rows in the 
+mysql.user table to have a nonempty plugin column value and disables accounts with an 
+empty value. This requires that you upgrade your mysql.user table to fill in all plugin 
+values. As of MySQL 5.7.6, use this procedure:
+
+    If you plan to upgrade using the data directory from your existing MySQL installation:
+
+        Stop the old (MySQL 5.6) server
+
+        Upgrade the MySQL binaries in place by replacing the old binaries with the new ones
+
+        Start the MySQL 5.7 server normally (no special options)
+
+        Run mysql_upgrade to upgrade the system tables
+
+        Restart the MySQL 5.7 server 
+
+    If you plan to upgrade by reloading a dump file generated from your existing MySQL
+ installation:
+
+        To generate the dump file, run mysqldump with the --add-drop-table option and
+ without the --flush-privileges option
+
+        Stop the old (MySQL 5.6) server
+
+        Upgrade the MySQL binaries in place (replace the old binaries with the new ones)
+
+        Start the MySQL 5.7 server normally (no special options)
+
+        Reload the dump file (mysql < dump_file)
+
+        Run mysql_upgrade to upgrade the system tables
+
+        Restart the MySQL 5.7 server 
+
+    Before MySQL 5.7.6, the procedure is more involved:
+
+    If you plan to upgrade using the data directory from your existing MySQL installation:
+
+        Stop the old (MySQL 5.6) server
+
+        Upgrade the MySQL binaries in place (replace the old binaries with the new ones)
+
+        Restart the server with the --skip-grant-tables option to disable privilege checking
+
+        Run mysql_upgrade to upgrade the system tables
+
+        Restart the server normally (without --skip-grant-tables) 
+
+    If you plan to upgrade by reloading a dump file generated from your existing MySQL installation:
+
+        To generate the dump file, run mysqldump without the --flush-privileges option
+
+        Stop the old (MySQL 5.6) server
+
+        Upgrade the MySQL binaries in place (replace the old binaries with the new ones)
+
+        Restart the server with the --skip-grant-tables option to disable privilege checking
+
+        Reload the dump file (mysql < dump_file)
+
+        Run mysql_upgrade to upgrade the system tables
+
+        Restart the server normally (without --skip-grant-tables) 
+
+    mysql_upgrade runs by default as the MySQL root user. For the preceding procedures, 
+if the root password is expired when you run mysql_upgrade, you will see a message that
+ your password is expired and that mysql_upgrade failed as a result. To correct this, 
+reset the root password to unexpire it and run mysql_upgrade again:
+
+    shell> mysql -u root -p
+    Enter password: ****  <- enter root password here
+    mysql> ALTER USER USER() IDENTIFIED BY 'root-password'; # MySQL 5.7.6 and up
+    mysql> SET PASSWORD = PASSWORD('root-password');        # Before MySQL 5.7.6
+    mysql> quit
+
+    shell> mysql_upgrade -p
+    Enter password: ****  <- enter root password here
+
+    The password-resetting statement normally does not work if the server is started 
+with --skip-grant-tables, but the first invocation of mysql_upgrade flushes the privileges,
+ so when you run mysql, the statement is accepted.
+
+    If mysql_upgrade itself expires the root password, you will need to reset it password
+ again in the same manner.
+
+    After following the preceding instructions, DBAs are advised also to convert accounts
+ that use the mysql_old_password authentication plugin to use mysql_native_password instead,
+ because support for mysql_old_password has been removed. For account upgrade instructions,
+ see Section 6.5.1.3, “Migrating Away from Pre-4.1 Password Hashing and the mysql_old_password Plugin”.
+
+    Incompatible change: It is possible for a column DEFAULT value to be valid for the sql_mode
+value at table-creation time but invalid for the sql_mode value when rows are
+ inserted or updated. Example:
+
+    SET sql_mode = '';
+    CREATE TABLE t (d DATE DEFAULT 0);
+    SET sql_mode = 'NO_ZERO_DATE,STRICT_ALL_TABLES';
+    INSERT INTO t (d) VALUES(DEFAULT);
+
+    In this case, 0 should be accepted for the CREATE TABLE but rejected for the 
+INSERT. However, previously the server did not evaluate DEFAULT values used for
+ inserts or updates against the current sql_mode. In the example, the INSERT succeeds 
+and inserts '0000-00-00' into the DATE column.
+
+    As of MySQL 5.7.2, the server applies the proper sql_mode checks to generate a
+
+ warning or error at insert or update time.
+
+    A resulting incompatibility for replication if you use statement-based logging 
+(binlog_format=STATEMENT) is that if a slave is upgraded, a nonupgraded master will
+ execute the preceding example without error, whereas the INSERT will fail on the 
+slave and replication will stop.
+
+    To deal with this, stop all new statements on the master and wait until the slaves
+ catch up. Then upgrade the slaves followed by the master. Alternatively, if you cannot
+ stop new statements, temporarily change to row-based logging on the master (binlog_format=ROW) 
+and wait until all slaves have processed all binary logs produced up to the point of this 
+change. Then upgrade the slaves followed by the master and change the master back to 
+statement-based logging.
+
+    Incompatible change: Several changes were made to the audit log plugin for better
+ compatibility with Oracle Audit Vault. For upgrading purpose, the main issue is that 
+the default format of the audit log file has changed: Information within <AUDIT_RECORD> 
+elements previously written using attributes now is written using subelements.
+
+    Example of old <AUDIT_RECORD> format:
+
+    <AUDIT_RECORD
+     TIMESTAMP="2013-04-15T15:27:27"
+     NAME="Query"
+     CONNECTION_ID="3"
+     STATUS="0"
+     SQLTEXT="SELECT 1"
+    />
+
+    Example of new format:
+
+    <AUDIT_RECORD>
+     <TIMESTAMP>2013-04-15T15:27:27 UTC</TIMESTAMP>
+     <RECORD_ID>3998_2013-04-15T15:27:27</RECORD_ID>
+     <NAME>Query</NAME>
+     <CONNECTION_ID>3</CONNECTION_ID>
+     <STATUS>0</STATUS>
+     <STATUS_CODE>0</STATUS_CODE>
+     <USER>root[root] @ localhost [127.0.0.1]</USER>
+     <OS_LOGIN></OS_LOGIN>
+     <HOST>localhost</HOST>
+     <IP>127.0.0.1</IP>
+     <COMMAND_CLASS>select</COMMAND_CLASS>
+     <SQLTEXT>SELECT 1</SQLTEXT>
+    </AUDIT_RECORD>
+
+    If you previously used an older version of the audit log plugin, use this procedure 
+to avoid writing new-format log entries to an existing log file that contains old-format entries:
+
+        Stop the server.
+
+        Rename the current audit log file manually. This file will contain only old-format log entries.
+
+        Update the server and restart it. The audit log plugin will create a new log file,
+ which will contain only new-format log entries. 
+
+    For information about the audit log plugin, see Section 6.5.5, “MySQL Enterprise Audit”. 
+
+InnoDB Changes
+
+    Incompatible change: To simplify InnoDB tablespace discovery during crash recovery,
+ new redo log record types were introduced in MySQL 5.7.5. This enhancement changes the
+ redo log format. Before performing an in-place upgrade, perform a clean shutdown using 
+an innodb_fast_shutdown setting of 0 or 1. A slow shutdown using innodb_fast_shutdown=0 
+is a recommended step in In-Place Upgrade.
+
+    Incompatible change: MySQL 5.7.8 and 5.7.9 undo logs may contain insufficient 
+information about spatial columns, which could result in a upgrade failure (Bug #21508582).
+ Before performing an in-place upgrade from MySQL 5.7.8 or 5.7.9 to 5.7.10 or higher,
+ perform a slow shutdown using innodb_fast_shutdown=0 to clear the undo logs. A slow shutdown 
+using innodb_fast_shutdown=0 is a recommended step in In-Place Upgrade.
+
+    Incompatible change: MySQL 5.7.8 undo logs may contain insufficient information about 
+virtual columns and virtual column indexes, which could result in a upgrade failure
+ (Bug #21869656). Before performing an in-place upgrade from MySQL 5.7.8 to MySQL 5.7.9
+ or higher, perform a slow shutdown using innodb_fast_shutdown=0 to clear the undo logs.
+ A slow shutdown using innodb_fast_shutdown=0 is a recommended step in In-Place Upgrade.
+
+    Incompatible change: As of MySQL 5.7.9, the redo log header of the first redo log file 
+(ib_logfile0) includes a format version identifier and a text string that identifies the
+ MySQL version that created the redo log files. This enhancement changes the redo log format,
+ requiring that MySQL be shutdown cleanly using an innodb_fast_shutdown setting of 0 or 1 
+before performing an in-place upgrade to MySQL 5.7.9 or higher. A slow shutdown using 
+innodb_fast_shutdown=0 is a recommended step in In-Place Upgrade.
+
+    In MySQL 5.7.9, DYNAMIC replaces COMPACT as the implicit default row format for InnoDB 
+
+tables. A new configuration option, innodb_default_row_format, specifies the default InnoDB
+ row format. Permitted values include DYNAMIC (the default), COMPACT, and REDUNDANT.
+
+    After upgrading to 5.7.9, any new tables that you create will use the row format 
+defined by innodb_default_row_format unless you explicitly define a row format (ROW_FORMAT).
+
+    For existing tables that do not explicitly define a ROW_FORMAT option or that use 
+ROW_FORMAT=DEFAULT, any operation that rebuilds a table also silently changes the row 
+format of the table to the format defined by innodb_default_row_format. Otherwise, 
+existing tables retain their current row format setting. For more information, see Section 
+14.11.2, “Specifying the Row Format for a Table”. 
+
+SQL Changes
+
+    Incompatible change: The GET_LOCK() function was reimplemented in MySQL 5.7.5 using the
+ metadata locking (MDL) subsystem and its capabilities have been extended:
+
+        Previously, GET_LOCK() permitted acquisition of only one named lock at a time, and
+ a second GET_LOCK() call released any existing lock. Now GET_LOCK() permits acquisition of
+ more than one simultaneous named lock and does not release existing locks.
+
+        Applications that rely on the behavior of GET_LOCK() releasing any previous lock
+ must be modified for the new behavior.
+
+        The capability of acquiring multiple locks introduces the possibility of deadlock
+ among clients. The MDL subsystem detects deadlock and returns an ER_USER_LOCK_DEADLOCK
+ error when this occurs.
+
+        The MDL subsystem imposes a limit of 64 characters on lock names, so this limit 
+now also applies to named locks. Previously, no length limit was enforced.
+
+        Locks acquired with GET_LOCK() now appear in the Performance Schema metadata_locks 
+table. The OBJECT_TYPE column says USER LEVEL LOCK and the OBJECT_NAME column indicates the lock name.
+
+        A new function, RELEASE_ALL_LOCKS() permits release of all acquired named locks at once. 
+
+    For more information, see Section 12.20, “Miscellaneous Functions”.
+
+    The optimizer now handles derived tables and views in the FROM clause in consistent 
+fashion to better avoid unnecessary materialization and to enable use of pushed-down 
+conditions that produce more efficient execution plans. However, for statements such 
+as DELETE or UPDATE that modify tables, using the merge strategy for a derived table
+that previously was materialized can result in an ER_UPDATE_TABLE_USED error:
+
+    mysql> DELETE FROM t1
+        -> WHERE id IN (SELECT id
+        ->              FROM (SELECT t1.id
+        ->                    FROM t1 INNER JOIN t2 USING (id)
+        ->                    WHERE t2.status = 0) AS t);
+    ERROR 1093 (HY000): You can't specify target table 't1'
+    for update in FROM clause
+
+    The error occurs when merging a derived table into the outer query block results 
+in a statement that both selects from and modifies a table. (Materialization does not
+ cause the problem because, in effect, it converts the derived table to a separate table.)
+ To avoid this error, disable the derived_merge flag of the optimizer_switch system 
+variable before executing the statement:
+
+    SET optimizer_switch = 'derived_merge=off';
+
+    The derived_merge flag controls whether the optimizer attempts to merge subqueries 
+and views in the FROM clause into the outer query block, assuming that no other rule
+ prevents merging. By default, the flag is on to enable merging. Setting the flag to 
+off prevents merging and avoids the error just described. For more information, see 
+Section 8.2.2.3, “Optimizing Derived Tables and View References”.
+
+    Some keywords may be reserved in MySQL 5.7 that were not reserved in MySQL 5.6. 
+See Section 9.3, “Keywords and Reserved Words”. This can cause words previously used
+ as identifiers to become illegal. To fix affected statements, use identifier quoting.
+ See Section 9.2, “Schema Object Names”.
+
+    After upgrading, it is recommended that you test optimizer hints specified in
+ application code to ensure that the hints are still required to achieve the desired 
+
+optimization strategy. Optimizer enhancements can sometimes render certain optimizer 
+hints unnecessary. In some cases, an unnecessary optimizer hint may even be counterproductive.
+
+    In UNION statements, to apply ORDER BY or LIMIT to an individual SELECT, place the
+ clause inside the parentheses that enclose the SELECT:
+
+    (SELECT a FROM t1 WHERE a=10 AND B=1 ORDER BY a LIMIT 10)
+    UNION
+    (SELECT a FROM t2 WHERE a=11 AND B=2 ORDER BY a LIMIT 10);
+
+    Previous versions of MySQL may permit such statements without parentheses.
+ In MySQL 5.7, the requirement for parentheses is enforced. 
+-----------------------------------------------------------------------------
+	Chapter 3 Upgrading MySQL with the MySQL Yum Repository
+-----------------------------------------------------------------------------
+https://dev.mysql.com/doc/mysql-repo-excerpt/5.6/en/updating-yum-repo.html
+-----------------------------------------------------------------------------
+ For supported Yum-based platforms (see Chapter 1, Installing MySQL on Linux
+Using the MySQL Yum Repository, for a list), you can perform an in-place upgrade
+for MySQL (that is, replacing the old version and then running the new version
+off the old data files) with the MySQL Yum repository.
+Notes
+
+    Before performing any update to MySQL, follow carefully the instructions
+in Upgrading MySQL. Among other instructions discussed there, it is especially
+important to back up your database before the update.
+
+    The following instructions assume you have installed MySQL with the MySQL
+Yum repository or with an RPM package directly downloaded from MySQL Developer
+Zone's MySQL Download page; if that is not the case, following the instructions in Chapter 2, Replacing a Third-Party Distribution of MySQL Using the MySQL Yum Repository. 
+
+    Selecting a Target Series
+
+    By default, the MySQL Yum repository updates MySQL to the latest version in
+the release series you have chosen during installation (see Selecting a Release
+Series for details), which means, for example, a 5.6.x installation will NOT be
+updated to a 5.7.x release automatically. To update to another release series,
+you need to first disable the subrepository for the series that has been selected
+(by default, or by yourself) and enable the subrepository for your target series.
+To do that, see the general instructions given in Selecting a Release Series. For
+upgrading from MySQL 5.6 to 5.7, perform the reverse of the steps illustrated in
+Selecting a Release Series, disabling the subrepository for the MySQL 5.6 series
+and enabling that for the MySQL 5.7 series.
+
+    As a general rule, to upgrade from one release series to another, go to the
+next series rather than skipping a series. For example, if you are currently running
+MySQL 5.5 and wish to upgrade to 5.7, upgrade to MySQL 5.6 first before upgrading to 5.7.
+    Important
+-----------------------------------------------------------------------------
+    For important information about upgrading from MySQL 5.6 to 5.7, see Upgrading
+from MySQL 5.6 to 5.7.
+-----------------------------------------------------------------------------
+    Upgrading MySQL
+
+    Upgrade MySQL and its components by the following command, for platforms that
+are not dnf-enabled:
+
+    sudo yum update mysql-server
+-----------------------------------------------------------------------------
+    For platforms that are dnf-enabled:
+
+    sudo dnf upgrade mysql-server
+-----------------------------------------------------------------------------
+    Alternatively, you can update MySQL by telling Yum to update everything on your
+system, which might take considerably more time; for platforms that are not dnf-enabled:
+
+    sudo yum update
+-----------------------------------------------------------------------------
+    For platforms that are dnf-enabled:
+
+    sudo dnf upgrade
+-----------------------------------------------------------------------------
+    Restarting MySQL
+-----------------------------------------------------------------------------
+    The MySQL server always restarts after an update by Yum. Once the server restarts,
+run mysql_upgrade to check and possibly resolve any incompatibilities between the old
+data and the upgraded software. mysql_upgrade also performs other functions; see
+mysql_upgrade — Check and Upgrade MySQL Tables for details. 
+-----------------------------------------------------------------------------
+You can also update only a specific component. Use the following command to list
+all the installed packages for the MySQL components (for dnf-enabled systems, replace
+yum in the command with dnf):
+
+sudo yum list installed | grep "^mysql"
+-----------------------------------------------------------------------------
+After identifying the package name of the component of your choice, for platforms
+that are not dnf-enabled, update the package with the following command, replacing
+package-name with the name of the package:
+
+sudo yum update package-name
+-----------------------------------------------------------------------------
+For dnf-enabled platforms:
+
+sudo dnf upgrade package-name
+-----------------------------------------------------------------------------
+Upgrading the Shared Client Libraries
+-----------------------------------------------------------------------------
+After updating MySQL using the Yum repository, applications compiled with
+older versions of the shared client libraries should continue to work.
+-----------------------------------------------------------------------------
+If you recompile applications and dynamically link them with the updated
+libraries: As typical with new versions of shared libraries where there are
+differences or additions in symbol versioning between the newer and older
+libraries (for example, between the newer, standard 5.6 shared client libraries
+and some older—prior or variant—versions of the shared libraries shipped
+natively by the Linux distributions' software repositories, or from some
+other sources), any applications compiled using the updated, newer shared
+libraries will require those updated libraries on systems where the applications
+are deployed. And, as expected, if those libraries are not in place, the
+applications requiring the shared libraries will fail. So, be sure to deploy
+the packages for the shared libraries from MySQL on those systems. You can do
+this by adding the MySQL Yum repository to the systems (see Adding the MySQL
+Yum Repository) and install the latest shared libraries using the instructions
+given in Installing Additional MySQL Products and Components with Yum. 
+-----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------------------------
+Примеры
+-----------------------------------------------------------------------------
+http://www.sromero.org/wiki/linux/aplicaciones/mysql/mysql57_centos7
+-----------------------------------------------------------------------------
+https://www.tecmint.com/install-latest-mysql-on-rhel-centos-and-fedora/
+-----------------------------------------------------------------------------
+alternatives
+-----------------------------------------------------------------------------
+Как же сделать так, чтобы система использовала эту, нужную нам, версию PHP?
+-----------------------------------------------------------------------------
+Сначала посмотрим на системную переменную PATH
+
+# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+-----------------------------------------------------------------------------
+
+В ней перечислен список директорий, в которых ищутся программы по имени. Главный
+нюанс — поиск в директориях происходит последовательно и используется первый
+найденный результат. Текущий путь до текущего бинарника PHP мы можем увидеть
+с помощью команды:
+
+# which php
+/usr/bin/php
+
+-----------------------------------------------------------------------------
+Как видно из PATH, /usr/local/bin находится в списке раньше, чем /usr/bin.
+Значит, если мы поместим ссылку на альтернативную версию PHP “пораньше”, в
+/usr/local/bin, то именно она и будет использоваться при вызове команды php
+вместо /usr/bin/php. Мы можем создать эту ссылку руками (и всё даже будет работать),
+но правильнее использовать специально созданную для этих целей утилиту
+update-alternatives (в CentOS это просто alternatives, но есть симлинка
+update-alternatives, поэтому дальше будем оперировать именно этой командой,
+как универсальной для Debian/Ubuntu/CentOS/и т.д.).
+-----------------------------------------------------------------------------
+Теперь, давайте зарегистрируем все доступные версии PHP с помощью этой команды:
+
+# update-alternatives --install /usr/local/bin/php php /opt/plesk/php/5.6/bin/php 10
+# update-alternatives --install /usr/local/bin/php php /opt/plesk/php/7.0/bin/php 20
+# update-alternatives --install /usr/local/bin/php php /usr/bin/php 30
+
+-----------------------------------------------------------------------------
+Цифры 10, 20 и 30 — это приоритет. Он работает для автоматического выбора, если
+администратор сам не выбрал конкретную версию. Самое большое число определяет
+выбор "по умолчанию".
+-----------------------------------------------------------------------------
+Проверим, что php теперь указывает на созданную командой симлинку:
+-----------------------------------------------------------------------------
+# update-alternatives --list | grep php
+php        auto        /usr/bin/php
+
+# update-alternatives --display php
+php - status is auto.
+ link currently points to /usr/bin/php
+/opt/plesk/php/5.6/bin/php - priority 10
+/opt/plesk/php/7.0/bin/php - priority 20
+/usr/bin/php - priority 30
+Current `best' version is /usr/bin/php.
+
+-----------------------------------------------------------------------------
+Давайте разберемся, что же update-alternatives сделала для нас:
+
+# which php
+/usr/local/bin/php
+# ls -l /usr/local/bin/php
+lrwxrwxrwx. 1 root root 21 Jul  2 10:03 /usr/local/bin/php -> /etc/alternatives/php
+# ls -l /etc/alternatives/php
+lrwxrwxrwx. 1 root root 26 Jul  2 10:03 /etc/alternatives/php -> /usr/bin/php
+-----------------------------------------------------------------------------
+
+Как видно, она создала цепочку симлинок и теперь по требованию просто меняет
+промежуточную симлинку на нужный нам бинарь.
+-----------------------------------------------------------------------------
+# php -v
+PHP 5.4.16 (cli) (built: May 12 2016 13:45:17)
+...
+
+-----------------------------------------------------------------------------
+То есть, мы успешно настроили группу PHP в update-alternatives, где по
+умолчанию в автоматическом режиме выбран системный PHP. Сейчас у нас есть
+возможность переключить команду PHP на любую другую версию..
+-----------------------------------------------------------------------------
+Давайте переключимся на PHP версии 5.6, которая идет в поставке с Plesk'ом:
+
+# update-alternatives --config php
+
+There are 3 programs which provide 'php'.
+
+  Selection    Command
+-----------------------------------------------
+   1           /opt/plesk/php/5.6/bin/php
+   2           /opt/plesk/php/7.0/bin/php
+*+ 3           /usr/bin/php
+
+Enter to keep the current selection[+], or type selection number: 1
+
+
+Проверяем, что переключение произошло:
+-----------------------------------------------------------------------------
+# php -v
+PHP 5.6.22 (cli) (built: May 27 2016 11:45:28)
+…
+# update-alternatives --display php
+php - status is manual.
+ link currently points to /opt/plesk/php/5.6/bin/php
+… 
+-----------------------------------------------------------------------------
+
+Все отлично работает. Теперь в системе используется нужная нам версия PHP и
+я не опасаюсь, что эта настройка слетит при следующих пакетных обновлениях.
+-----------------------------------------------------------------------------
+С помощью update-alternatives можно выбирать не только версию PHP, но и
+многие другие вещи, например разные версии phpunit или редактор по умолчанию
+в системе. Подход этот универсален для различных систем. Не изобретая своего
+велосипеда, используя существующие инструменты, вы можете быть уверенным,
+что не устроили для ваших коллег квеста “Ну почему оно так работает?!”.
+Настраивайте свою систему правильно. 
+-----------------------------------------------------------------------------
+	Дополнение
+-----------------------------------------------------------------------------
+ А вот бы еще придумать, как для каждого пользователя (или даже в разных
+каталогах одного пользователя) иметь свою версию PHP включенной.
+-----------------------------------------------------------------------------
+ У update-alternatives есть возможность задать альтернативные директории для
+конфигов и симлинок. Через /etc/profile.d можно добавить уникальный кастомный
+путь в PATH для каждого пользователя. Для простоты использования
+update-alternatives --altdir.. --admindir.. можно завернуть в алиас для
+пользователя через тот же /etc/profile.d. Таким образом каждый пользователь
+сможет менять дефолтную версию PHP для себя. Скорее всего, при создании
+пользователя, директории нужно будет создавать отдельно каким-нибудь костылем :)
+-----------------------------------------------------------------------------
+Структурой домашней директории можно через /etc/skel управлять без костылей.
+Самый простой и старый механизм — переопределить $PATH персональной директорией со ссылками:
+
+        echo export PATH=$HOME/bin:'$PATH' >> ~/.profile
+        ln -s /opt/plesk/php/5.6/bin/php $HOME/bin/php
+
+Конечно, не так красиво, как вызов update-alternatives с флагами, но, по
+большому счету, к этому и сводится в итоге.
+----------------------------------------------------------------------------- 
 ===============
 L9.MONITORING
 ===============
