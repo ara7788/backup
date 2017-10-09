@@ -10433,23 +10433,248 @@ SSL
 -----------------------------------------------------------------------------
 	Install
 -----------------------------------------------------------------------------
+hostname -f
+sudo yum clean all
+yum -y update
+sudo yum -y install httpd
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --reload
+или
+sudo firewall-cmd --add-service=http --permanent && sudo firewall-cmd --add-service=https --permanent
+sudo systemctl restart firewalld
+sudo systemctl start httpd
+sudo systemctl enable httpd
+-----------------------------------------------------------------------------
+cp /etc/httpd/conf/httpd.conf ~/httpd.conf.backup
+/etc/httpd/conf/httpd.conf
 
+      DocumentRoot "/var/www/html/example.com/public_html"
+
+    ...
+
+    <IfModule prefork.c>
+        StartServers        5
+        MinSpareServers     20
+        MaxSpareServers     40
+        MaxRequestWorkers   256
+        MaxConnectionsPerChild 5500
+    </IfModule>
+sudo systemctl restart httpd
 -----------------------------------------------------------------------------
 	Commands
 -----------------------------------------------------------------------------
 	apachectl
 -----------------------------------------------------------------------------
-	
+В первом режиме Apachectl выступает как интерфейс для получения HTTPD-команд.
+Просмотреть доступные команды можно с помощью ключа -h, либо же выполнив
+команду Apachectl без аргументов:
+-----------------------------------------------------------------------------
+# apachectl -h
+Usage: /usr/local/sbin/httpd [-D name] [-d directory] [-f file]
+                             [-C "directive"] [-c "directive"]
+                             [-k start|restart|graceful|graceful-stop|stop]
+                             [-v] [-V] [-h] [-l] [-L] [-t] [-S]
+Options:
+  -D name            : define a name for use in <IfDefine name> directives
+  -d directory       : specify an alternate initial ServerRoot
+  -f file            : specify an alternate ServerConfigFile
+  -C "directive"     : process directive before reading config files
+  -c "directive"     : process directive after reading config files
+  -e level           : show startup errors of level (see LogLevel)
+  -E file            : log startup errors to file
+  -v                 : show version number
+  -V                 : show compile settings
+  -h                 : list available command line options (this page)
+  -l                 : list compiled in modules
+  -L                 : list available configuration directives
+  -t -D DUMP_VHOSTS  : show parsed settings (currently only vhost settings)
+  -S                 : a synonym for -t -D DUMP_VHOSTS
+  -t -D DUMP_MODULES : show all loaded modules
+  -M                 : a synonym for -t -D DUMP_MODULES
+  -t                 : run syntax check for config files
+
+Для примера, воспользуемся двумя самыми простыми коммандами:
+# apachectl -v
+Server version: Apache/2.2.17 (FreeBSD)
+Server built:   Dec 18 2010 20:45:37
+# apachectl -t
+Syntax OK
+
+Первая команда - узнали версию програмного обеспечения web-сервера. Вторая
+- проверили конфигурационный файл на наличие ошибок.
+
+Советую поэкспериментировать с остальными ключами.
+-----------------------------------------------------------------------------
+Во втором режиме Apachectl работает как сценарий инициализации, позволяя
+запустить, остановить и перезапустить web-сервер. Доступные ключи:
+-----------------------------------------------------------------------------
+    start - запуск демона Apache HTTPD. Выдает ошибку, если он уже запущен.
+Аналог apachectl -k start.
+    stop - останов демона Apache HTTPD. Аналог apachectl -k stop.
+    restart - перезапуск демона Apache HTTPD. Если демон не запущен,
+он запускается. Эта команда автоматически проверяет файлы конфигурации
+(запуск Apachectl с ключем configtest) перед началом перезапуска, чтобы
+убедиться, что демон не будет остановлен вследствии ошибки конфигурации.
+Аналог apachectl -k restart.
+    fullstatus - отображает полный рапорт о состоянии с помощью модуля
+mod_status. Необходимо, чтобы mod_status был включен в конфигурации демона
+Apache. Также необходима поддержка текстового браузера (например lynx).
+URL-адрес используется для отчета о статусе и может задаваться переменной
+STATUSURL.
+    status - отображение базового отчета о статусе демона Apache. Похоже
+на fullstatus, только список запросов на данный момент не отображается.
+    graceful -  "мягкий" перезапуск демона Apache HTTPD. Если демон не запущен,
+он запускается. Отличие от restart в том, что уже открытые соединения не
+разрываются. Побочным эффектом является то, что старые файлы журналов не
+будут немедленно закрыты. Эта команда автоматически проверяет файлы
+конфигурации (запуск Apachectl с ключем configtest) перед началом перезапуска,
+чтобы убедиться, что демон не будет остановлен вследствии ошибки конфигурации.
+Аналог apachectl -k graceful.
+    configtest - проверка синтаксиса файла конфигурации. Анализирует файлы
+конфигурации и в случае положительной проверки, выводит "Syntax OK". Если
+же в файле конфигурации присутствует ошибка, то будет выведена подробная
+информация о ошибке.
+
+# apachectl configtest
+# apachectl -k graceful
+# apachectl -k graceful
+# apachectl status
+# apachectl fullstatus
+restart 
 -----------------------------------------------------------------------------
 	htpasswd
 -----------------------------------------------------------------------------
+# sudo htpasswd -c /etc/httpd/.htpasswd user1
+
+Only use -c the first time you create the file. Do not use -c when you add a
+user in the future.
+-----------------------------------------------------------------------------
+# htpasswd
+
+Usage:
+	htpasswd [-cmdpsD] passwordfile username
+	htpasswd -b[cmdpsD] passwordfile username password
+
+	htpasswd -n[mdps] username
+	htpasswd -nb[mdps] username password
+-c Create a new file.
+-n Don't update file; display results on stdout.
+-m Force MD5 encryption of the password.
+-d Force CRYPT encryption of the password (default).
+-p Do not encrypt the password (plaintext).
+-s Force SHA encryption of the password.
+-b Use the password from the command line rather than prompting for it.
+-D Delete the specified user.
+On Windows, NetWare and TPF systems the '-m' flag is used by default.
+On all other systems, the '-p' flag will probably not work.
 
 -----------------------------------------------------------------------------
 	htcacheclean
 -----------------------------------------------------------------------------
+# /etc/init.d/apache2 stop -- Debian or Ubuntu
+# apachectl -k graceful-stop -- RHEL, CentOS or Fedora
+
+# htcacheclean -r
+
+# /etc/init.d/apache2 start -- Debian or Ubuntu
+# apachectl start -- RHEL, CentOS or Fedora
+-----------------------------------------------------------------------------
+Periodically Cleaning the Cache
+-----------------------------------------------------------------------------
+# htcacheclean -d30 -n -t -p /var/cache/apache2/mod_disk_cache -l 100M -i
+
+If need
+# killall -9 htcacheclean
+-----------------------------------------------------------------------------
+How To Configure Apache Content Caching on CentOS 7 
+https://www.digitalocean.com/community/tutorials/how-to-configure-apache-content-caching-on-centos-7
+-----------------------------------------------------------------------------
+How to Flush Apache's Cache
+-----------------------------------------------------------------------------
+https://www.techwalla.com/articles/how-to-flush-apaches-cache
+-----------------------------------------------------------------------------
+Пример 1	Модули mod_cache и mod_disk_cache
+-----------------------------------------------------------------------------
+Модули mod_cache и mod_disk_cache
+Теперь включить:
+
+    a2enmod cache
+    a2enmod disk_cache
+    /etc/init.d/apache2 restart
+-----------------------------------------------------------------------------
+Чтобы каталог для кеша /var/cache/apache2/mod_disk_cache не переполнится через
+какое-то время, придется чистить его командой htcacheclean.
+
+Эта команда часть пакета apache2-utils,
+ После можно запустить htcacheclean как демон:
+-----------------------------------------------------------------------------
+htcacheclean -d30 -n -t -p /var/cache/apache2/mod_disk_cache -l 100M -i
+-----------------------------------------------------------------------------
+Это позволит чистить каталог с кешем каждые 30 минут и удостовериться, что он
+не превысит 100MB.
 
 -----------------------------------------------------------------------------
+Пример 2	mod_mem_cache
+-----------------------------------------------------------------------------
 
+Конфигурация mod_mem_cache в mem_cache.conf
+CacheEnable mem /
+
+    MCacheSize 4096
+    MCacheMaxObjectCount 100
+    MCacheMinObjectSize 1
+    MCacheMaxObjectSize 2048
+
+Это конфигурация по умолчанию. Список директив для mod_mem_cache досотупен в ман.
+Включим mod_cache и mod_mem_cache:
+
+    a2enmod cache
+    a2enmod mem_cache
+    /etc/init.d/apache2 restart
+
+-----------------------------------------------------------------------------
+Пример 3	mod_disk_cache
+-----------------------------------------------------------------------------
+Configuring Apache mod_disk_cache
+-----------------------------------------------------------------------------
+ To configure Apache to cache static Confluence content:
+-----------------------------------------------------------------------------
+   1. Add a mod_disk_cache stanza to the virtual host configuration:
+-----------------------------------------------------------------------------
+    <IfModule mod_disk_cache.c>
+      # "/s" is where Confluence serves "static" stuff. Instruct Apache to cache it:
+      CacheEnable disk /s
+      CacheIgnoreHeaders Set-Cookie
+      CacheRoot "/var/cache/mod_proxy"
+    </IfModule>
+-----------------------------------------------------------------------------
+   2. Configure Apache to load mod_disk_cache. For example, in our server
+configuration this is done in /etc/httpd/conf/httpd.conf:
+-----------------------------------------------------------------------------
+    LoadModule disk_cache_module modules/mod_disk_cache.so
+
+   3. Restart Apache after both modifications are complete.
+-----------------------------------------------------------------------------
+Notes
+
+    Please refer to the Apache documentation for mod_disk_cache.
+-----------------------------------------------------------------------------
+    If you encounter problems where users are served stale content, you may need
+to purge the Apache cache directory (/var/cache/mod_proxy in the above
+configuration) after a Confluence or plugin upgrade. This is a simple 3 step process:
+-----------------------------------------------------------------------------
+        Shutdown Apache.
+        Clear the cache directory. For example: sudo rm -r /var/cache/mod_proxy/*
+        Restart Apache.
+-----------------------------------------------------------------------------
+    Ensure that you are running the htcacheclean daemon in order to prevent
+excessive use of disk space. In our situation we ran it like this:
+-----------------------------------------------------------------------------
+    sudo htcacheclean -d30 -n -t -p /var/cache/mod_proxy -l 512M
+-----------------------------------------------------------------------------
+    This will purge content once the cache reaches 512M every 30 minutes.
+ See the Apache documentation for htcacheclean for details of the options
 -----------------------------------------------------------------------------
 	Configuration
 -----------------------------------------------------------------------------
@@ -10526,10 +10751,22 @@ EnableSendfile on
 </IfModule>
 
 IncludeOptional conf.d/*.conf
------------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
 	VirtualHost
+-----------------------------------------------------------------------------
+Как настроить виртуальные хосты в Apache на Ubuntu 16.04 
+-----------------------------------------------------------------------------
+https://www.digitalocean.com/community/tutorials/apache-ubuntu-16-04-ru
+-----------------------------------------------------------------------------
+<VirtualHost *:80>
+    ServerAdmin admin@example.com
+    ServerName example.com
+    ServerAlias www.example.com
+    DocumentRoot /var/www/example.com/public_html
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
@@ -10546,12 +10783,6 @@ IncludeOptional conf.d/*.conf
 сколько памяти в килобайтах потребляет каждый процесс Apache можно такой командой:
 
 # ps -ylC httpd | awk {'print $8,$13'};
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -----------------------------------------------------------------------------
 	.htpasswd/.htaccess/Access by IP
 -----------------------------------------------------------------------------
@@ -10655,11 +10886,59 @@ Deny from 33.250.11.25
 -----------------------------------------------------------------------------
 	Modules/IFModule/LoadModule
 -----------------------------------------------------------------------------
+IFModule Модули мультиобработки worker, prefork
+Выполняется только если указанный модуль загружен.
+-----------------------------------------------------------------------------
+LoadModule - Загружают DSO модули
+-----------------------------------------------------------------------------
+/etc/httpd/conf/httpd.conf
+      ServerRoot "/etc/httpd"
+      Include /etc/conf.modules.d/*.conf
+      DocumentRoot "/var/www/html/example.com/public_html"
 
+    ...
+
+    <IfModule prefork.c>
+        StartServers        5
+        MinSpareServers     20
+        MaxSpareServers     40
+        MaxRequestWorkers   256
+        MaxConnectionsPerChild 5500
+    </IfModule>
+-----------------------------------------------------------------------------
+<IfModule mod_disk_cache.c>
+      # "/s" is where Confluence serves "static" stuff. Instruct Apache to cache it:
+      CacheEnable disk /s
+      CacheIgnoreHeaders Set-Cookie
+      CacheRoot "/var/cache/mod_proxy"
+    </IfModule>
+-----------------------------------------------------------------------------
+<IfModule mime_magic_module>
+    MIMEMagicFile conf/magic
+</IfModule>
+-----------------------------------------------------------------------------
+<IfModule remoteip_module>
+    RemoteIPHeader X-Real-IP
+    LogFormat "%a %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    LogFormat "%a %l %u %t \"%r\" %>s %b" common
+</IfModule>
+-----------------------------------------------------------------------------
+/etc/httpd/conf.modules.d/10-php.conf ->
+->
+	<IfModule prefork.c>
+  		LoadModule php5_module modules/libphp5.so
+	</IfModule>
+-----------------------------------------------------------------------------
+/etc/httpd/conf.modules.d/00-base.conf ->
+->
+	LoadModule rewrite_module modules/mod_rewrite.so
+	#LoadModule reflector_module modules/mod_reflector.so
 -----------------------------------------------------------------------------
 	Rewright
 -----------------------------------------------------------------------------
-
+Модуль mod_rewrite - URL преобразований сервера Apache/Директивы
+-----------------------------------------------------------------------------
+http://htaccess.net.ru/doc/mod_rewrite/mod_rewrite.php
 -----------------------------------------------------------------------------
 	SSL
 -----------------------------------------------------------------------------
