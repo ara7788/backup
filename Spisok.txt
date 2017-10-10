@@ -9417,12 +9417,234 @@ tail -f /var/log/httpd/domains/default.domain.error.log
 -----------------------------------------------------------------------------
 	MySQL
 -----------------------------------------------------------------------------
-Инсталяция
+Installation
+-----------------------------------------------------------------------------
+Configuration
+-----------------------------------------------------------------------------
+Optimization
+-----------------------------------------------------------------------------
+Monitoring
+-----------------------------------------------------------------------------
+Commands
+-----------------------------------------------------------------------------
+Backup/Restore
+-----------------------------------------------------------------------------
+Replication
+-----------------------------------------------------------------------------
+	Installation
+-----------------------------------------------------------------------------
+http://dev.mysql.com/downloads/repo/yum/. 
+sudo rpm -Uvh platform-and-version-specific-package-name.rpm
+sudo rpm -Uvh mysql57-community-release-el6-n.noarch.rpm
+yum repolist all | grep mysql
+-----------------------------------------------------------------------------
+shell> sudo yum-config-manager --disable mysql57-community
+shell> sudo yum-config-manager --enable mysql56-community
+-----------------------------------------------------------------------------
+ Besides using yum-config-manager or the dnf config-manager command, you can
+also select a series by editing manually the /etc/yum.repos.d/mysql-community.repo
+file. This is a typical entry for a release series' subrepository in the file:
+
+[mysql57-community]
+name=MySQL 5.7 Community Server
+baseurl=http://repo.mysql.com/yum/mysql-5.7-community/el/6/$basearch/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-mysql
+-----------------------------------------------------------------------------
+yum repolist enabled | grep mysql
+sudo yum install mysql-community-server
+sudo systemctl start mysqld.service
+sudo systemctl enable mysqld.service
+sudo systemctl status mysqld.service
+-----------------------------------------------------------------------------
+MySQL Server Initialization (for MySQL 5.7 only): At the initial start up of
+the server, the following happens, given that the data directory of the server
+is empty:
+-----------------------------------------------------------------------------
+    The server is initialized.
+
+    An SSL certificate and key files are generated in the data directory.
+
+    The validate_password plugin is installed and enabled.
+The validate_password plugin serves to test passwords and improve security.
+The plugin exposes a set of system variables that enable you to define
+password policy. 
+-----------------------------------------------------------------------------
+    A superuser account 'root'@'localhost' is created. A password for the
+superuser is set and stored in the error log file. To reveal it, use the
+following command:
+-----------------------------------------------------------------------------
+    shell> sudo grep 'temporary password' /var/log/mysqld.log
+    shell> mysql -uroot -p
+    mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyNewPass4!';
+    shell> mysql_secure_installation
+    sudo systemctl restart mysqld.service
+-----------------------------------------------------------------------------
+shell> yum --disablerepo=\* --enablerepo='mysql*-community*' list available
+shell> sudo yum install package-name
+-----------------------------------------------------------------------------
+UPDATE
+-----------------------------------------------------------------------------
+For important information about upgrading from MySQL 5.7 to 8.0, see Upgrading
+from MySQL 5.7 to 8.0. 
+https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html
+-----------------------------------------------------------------------------
+shell> sudo yum update mysql-server
+-----------------------------------------------------------------------------
+ Once the server restarts, run mysql_upgrade to check and possibly resolve
+any incompatibilities between the old data and the upgraded software.
+mysql_upgrade also performs other functions; see mysql_upgrade —
+Check and Upgrade MySQL Tables for details. 
+https://dev.mysql.com/doc/refman/5.7/en/mysql-upgrade.html
+-----------------------------------------------------------------------------
+ mysql_upgrade examines all tables in all databases for incompatibilities with
+the current version of MySQL Server. mysql_upgrade also upgrades the system
+tables so that you can take advantage of new privileges or capabilities that
+might have been added.
+
+If mysql_upgrade finds that a table has a possible incompatibility, it performs
+a table check and, if problems are found, attempts a table repair. If the table
+cannot be repaired, see Section 2.11.3, “Rebuilding or Repairing Tables or
+Indexes” for manual table repair strategies.
+
+You should execute mysql_upgrade each time you upgrade MySQL.
+mysql_upgrade needed server and client.
+-----------------------------------------------------------------------------
+shell> sudo yum list installed | grep "^mysql"
+shell> sudo yum update package-name
 -----------------------------------------------------------------------------
 yum install mysql-server php5-mysql
 sudo /usr/bin/mysql_secure_installation
 -----------------------------------------------------------------------------
-Оптимизация
+	Configuration
+-----------------------------------------------------------------------------
+/etc/my.cnf
+/var/lib/mysql/*
+/var/log/mysql.log
+/var/log/slowmysql.log
+-----------------------------------------------------------------------------
+DB
+-----------------------------------------------------------------------------
+Scheme	-	Схема
+MySql	-	Административная
+	Table
+	user - Пользователи	DB Назначенные БД	Host - local/IP/% 
+-----------------------------------------------------------------------------
+MyISAM: Движок по умолчанию. Не поддерживает транзакций, средняя надежность
+хранения данных. Превосходная производительность чтения данных для интенсивных
+приложений. Большинство веб сервисов и хранилищ данных активно используют MyISAM. 
+-----------------------------------------------------------------------------
+HEAP: Все в памяти. Очень быстрый поиск данных, однако все они хранятся только
+в памяти и будут потеряны при остановке сервера. Великолепно подходит для
+временных таблиц. 
+-----------------------------------------------------------------------------
+Archive: Используется для хранения больших объемов данных без индексов,
+занимая меньший размер.
+-----------------------------------------------------------------------------
+Merge: Коллекция MyISAM таблиц логически объединенных вместе для единого
+представления. 
+-----------------------------------------------------------------------------
+InnoDB: Транзакционный тип движка, применяемый при интенсивных операциях
+записи, спасибо возможности блокировки уровня строк таблицы. Великолепная
+восстанавливаемость и высокая надежность хранения данных. Движок InnoDB
+был приобретен Oracle в 2005 году. 
+-----------------------------------------------------------------------------
+NDB: Кластерный движок — данные автоматически разделяются и реплицируются по
+различным машинам, именуемым — дата узлы. Применяется для приложений, которые
+требуют высокой производительности с наивысшей степенью доступности. NDB
+хорошо работает на системах требующих высокой отдачи на операциях чтения. Для
+«тяжелых» приложений требующих активной записи в конкурирующей среде
+рассмотрите вариант с InnoDB. 
+-----------------------------------------------------------------------------
+ Важные замечания по MyISAM таблицам:
+
+    Таблицы могут быть повреждены. Ежедневно архивируйте Ваши данные или установите еще один MySQL сервер для выполнения репликаций.
+    Включите авто-восстановление (auto-repair) в настройках Вашего сервера (my.cnf):
+    myisam-recover=backup,force
+    или рассмотрите возможность выполнения ежедневной автоматической проверки таблиц баз данных.
+    Очень быстрое чтение данных (через SELECT)
+    Конкурирующие записи полностью блокируют таблицы. Переключите все, что возможно, на оффлайн обработку записей сериями, что-бы не загружать движок сервера баз данных. (Оффлайн обработка — золотое правило, применимое для всех типов таблиц)
+
+
+.frm — структура таблицы, этот файл содержит информацию об именах и типах столбцов и индексов;
+.MYD — в этом файле содержатся данные таблицы;
+.MYI — в этом файле содержатся индексы таблицы.
+
+Таблицы MyISAM обладают рядом особенностей:
+1. Данные хранятся в кроссплатформенном формате, что позволяет переносить базы с сервера непосредственным копированием файлов, минуя промежуточные формы.
+2. Максимальное количество индексов — 64 (с версии 4.1.2). Каждый индекс может быть максимум из 16 столбцов.
+3. С версии MySQL 4.1, для каждого текстового столбца может быть задана своя кодировка.
+4. Допускается индексирование текстовых столбцов, в том числе и переменной длины.
+5. Поддерживается полнотекстовый поиск.
+6. Таблицы имеют специальный флаг, указывающий на правильность закрытия таблицы. Если сервер был остановлен аварийно, то при загрузке незакрытые флаги будут сигнализировать о возможных поврежденных таблицах и сервер попытается автоматически их проверить и восстановить.
+
+Создание MyISAM таблицы с явным указанием типа:
+
+create table teble1 (i INT) ENGINE = MyISAM;
+//Или
+create table teble1 (i INT) TYPE = MyISAM;
+
+https://kbss.ru/blog/bd_mysql/82.html
+-----------------------------------------------------------------------------
+ Важные замечания по InnoDB таблицам:
+
+    Поддержка ACID транзакций. Встроенная отказоустойчивость данных, равная надежности 99.999%. Блокировка уровня строк (сравните с полной блокировкой всей таблицы в MyISAM) означает обеспечение быстрой записи конкурирующих операций.
+    Выполнение «SELECT Count(*) FROM table» без индексов выполняется в InnoDB очень медленно и требует сканирования всей таблицы. (Для MyISAM эта операция ничего не стоит, потому что он хранит внешние записи счетчиков для каждой таблицы).
+    Если Вам часто необходима операция «SELECT COUNT(*)» на таблицах InnoDB, создайте MySQL триггер на вставку/удаление, который будет увеличивать/уменьшать счетчик, когда данные добавляются или удаляются из таблицы.
+    Резервирование (бакапирование)
+    Простое архивирование всех файлов таблиц для InnoDB невозможно.
+    MySQLDump резервирует InnoDB очень медленно. (Если Вы настаиваете на таком резервировании, включите флаг: —opt —compress)
+    Быстрое жизнеспособное резервирование, которое так-же может быть использовано как новая «ведомая» (slave) машина, это InnoDB Hot Backup.
+    Восстановление
+    В InnoDB встроена поддержка восстановления, которая работает в 99% случаев автоматически. Никогда не трогайте .frm или .ibd файлы в надежде «помочь» восстановлению базы данных. Если встроенное восстановление не сработало, переключайтесь на «ведомый» сервер и восстанавливайте основной из архивов.
+    LOAD DATA INFILE в InnoDB работает очень медленно. Для операций LOAD DATA присмотритесь к использованию MyISAM таблиц.
+    InnoDB меньше, чем MyISAM, прощает выполнение запросов построенных не на индексах. InnoDB отправит Вас в «школу», что-бы быть уверенным, что каждый запрос или обновление будет запущено на индексах. Выполните непроиндексированный запрос и Вы поплатитесь за это временем исполнения.
+    Никогда не изменяйте my.cnf InnoDB лог файл, когда запущен сервер баз данных. Вы разрушите последовательный лог-номер (log sequence number) оставшись без возможность восстановления.
+    Для увеличения производительности InnoDB, присмотритесь к использованию следующих настроек (my.cnf):
+
+    innodb_open_files = 500
+    innodb_file_per_table
+    innodb_buffer_pool_size = 250M
+    innodb_flush_log_at_trx_commit = 2
+    innodb_thread_concurrency =8
+    innodb_lock_wait_timeout = 500
+    interactive_timeout = 20
+    back_log = 75
+    table_cache = 300
+    thread_cache = 32
+    thread_concurrency = 8
+    wait_timeout = 30
+    connect_timeout = 10
+
+
+InnoDB
+
+    Тип таблиц InnoDB разработан компанией Innobase Oy. Таблицы такого типа предоставляют высокую производительность и устойчивое хранение данных в таблицах объёмом до 1 Тбайт и нагрузкой на сервер до 800 вставок/обновлений в секунду.
+
+Особенности типа InnoDB:
+1. Все таблицы хранятся в едином табличном пространстве, поэтому имена таблиц должны быть уникальны.
+2. Хранение данных в едином табличном пространстве позволяет снять ограничение на объём таблиц. Файл с таблицами может быть разбит на несколько частей и распределён по нескольким дискам или даже хостам.
+3. Таблицы поддерживают автоматическое восстановление после сбоя.
+4. Поддерживаются транзакции.
+5. Этот тип таблиц в MySQL единственный, который поддерживает каскадное удаление и внешние ключи.
+6. Выполняется блокировка на уровне отдельных записей.
+7. Имеется расширенная поддержка кодировок.
+
+Пример создания таблицы InnoDB:
+
+create table tab1 (field1 INT, field2 CHAR(10), INDEX (field1)) ENGINE=InnoDB;
+
+-----------------------------------------------------------------------------
+InnoDB data files
+----------------------------------------------------------------------------- 
+	ibdata files 
+	.ibd files
+InnoDB log files
+	ib_logfile files
+	gbichot2-bin.000001
+-----------------------------------------------------------------------------
+	Optimization
 -----------------------------------------------------------------------------
 Первое, что рекомендуют при оптимизации любой БД в Unix системах, это включение
 опции noatime для раздела с данными БД. При этом отключается запись информации
@@ -9495,6 +9717,1140 @@ echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
 Если предыдущие советы рекомендуются к использованию на всех системах, то
 данный раздел больше применим при жёстком дефиците ресурсов.
+-----------------------------------------------------------------------------
+	Monitoring
+-----------------------------------------------------------------------------
+show processlist;
+show status;
+mysql> SHOW GLOBAL STATUS;
+mysql> SHOW GLOBAL VARIABLES;
+mysql> show databases;
+mysql> show tables;
+mytop в режиме реального времени.
+Innotop
+mysqladmin -variables;
+-----------------------------------------------------------------------------
+	Commands
+-----------------------------------------------------------------------------
+/usr/bin/mysqladmin -u root password 'new-password'
+/usr/bin/mysqld или /usr/bin/mysqld_safe&
+mysql>\s – статус или status
+mysql> show databases;
+mysql> DROP DATABASE test;
+mysql> CREATE DATABASE company;
+mysql> USE company;
+mysql> CREATE TABLE users ( id INT(5) AUTO_INCREMENT PRIMARY KEY, name VARCHAR(64), surname VARCHAR(64), age TINYINT(3), email VARCHAR(64), status VARCHAR(128)) DEFAULT CHARACTER SET UTF8;
+mysql> show tables;
+-----------------------------------------------------------------------------
+mysql> DESCRIBE users;
+Выводит информацию по указанной таблице, имена колонок, типы данных и т.д.
+Это
+укороченный вариант команды SHOW COLUMNS FROM. Можно укоротить вообще до DESC.
+-----------------------------------------------------------------------------
+mysql> INSERT INTO users VALUES('', 'Ivan', 'Petrov', '25', 'petrov@company.ru', 'work');
+или из файла mysql> SOURCE /root/sourcefi le.sql;
+mysql> UPDATE users SET status='work' WHERE surname='Malevin';
+mysql> DELETE from users WHERE surname='Karpin';
+SELECT COUNT (*) FROM users;
+SHOW PROSESSLIST; - текущие процессы в базе
+-----------------------------------------------------------------------------
+
+#############
+#MYSQL
+#############
+---------------------------------------------------------------
+MySql_5.5
+---------------------------------------------------------------
+mysql -uroot -ppassword
+---------------------------------------------------------------
+mysql> CREATE USER 'jeffrey'@'localhost' IDENTIFIED BY 'mypass';
+mysql> SET PASSWORD FOR 'jeffrey'@'localhost' = PASSWORD('mypass');
+mysql> SET PASSWORD = PASSWORD('mypass');
+mysql> GRANT USAGE ON *.* TO 'jeffrey'@'localhost' IDENTIFIED BY 'mypass';
+shell> mysqladmin -u user_name -h host_name password "new_password"
+---------------------------------------------------------------
+mysql> CREATE USER 'finley'@'localhost' IDENTIFIED BY 'some_pass';
+mysql> GRANT ALL PRIVILEGES ON *.* TO 'finley'@'localhost' WITH GRANT OPTION;
+mysql> CREATE USER 'finley'@'%' IDENTIFIED BY 'some_pass';
+mysql> GRANT ALL PRIVILEGES ON *.* TO 'finley'@'%' WITH GRANT OPTION;
+mysql> CREATE USER 'admin'@'localhost' IDENTIFIED BY 'admin_pass';
+mysql> GRANT RELOAD,PROCESS ON *.* TO 'admin'@'localhost';
+mysql> CREATE USER 'dummy'@'localhost';
+---------------------------------------------------------------
+mysql> SHOW GRANTS FOR 'admin'@'localhost';
+---------------------------------------------------------------
+mysql> CREATE USER 'custom'@'localhost' IDENTIFIED BY 'obscure';
+mysql> GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP ON bankaccount.* TO 'custom'@'localhost';
+mysql> CREATE USER 'custom'@'host47.example.com' IDENTIFIED BY 'obscure';
+mysql> GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP ON expenses.* TO 'custom'@'host47.example.com';
+mysql> CREATE USER 'custom'@'%.example.com' IDENTIFIED BY 'obscure';
+mysql> GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP ON customer.* TO 'custom'@'%.example.com';
+---------------------------------------------------------------
+mysql> REVOKE ALL ON dbname.* FROM 'user'@'localhost';
+---------------------------------------------------------------
+mysql> DROP USER 'jeffrey'@'localhost';
+---------------------------------------------------------------
+mysql> SELECT USER(), CURRENT_USER();
+---------------------------------------------------------------
+mysql> RENAME USER ''@'localhost' TO 'user1'@'localhost';
+mysql> RENAME USER 'user2'@'%.example.com' TO 'user2'@'remote.example.com';
+---------------------------------------------------------------
+mysql> FLUSH PRIVILEGES;
+---------------------------------------------------------------
+mysql> SHOW DATABASES;
+---------------------------------------------------------------
+mysql> SHOW TABLES;
+---------------------------------------------------------------
+mysql> SHOW GLOBAL STATUS;
+---------------------------------------------------------------
+mysql> SHOW VARIABLES LIKE 'colla%'\g
+mysql> SHOW GLOBAL VARIABLES LIKE 'colla%tabase'\g
+---------------------------------------------------------------
+mysql> SET max_join_size=111111111111111111\g
+mysql> SET GLOBAL max_join_size=111111111111111111\g
+mysql> SET max_join_size=DEFAULT\g
+---------------------------------------------------------------
+CHECK TABLE имя_таблицы [ FOR UPGRADE | QUICK | FAST | MEDIUM | EXTENDED | CHANGED ]
+Проверка таблицы на предмет ошибок в различных режимах.
+---------------------------------------------------------------
+OPTIMIZE TABLE имя_таблицы
+Оптимизация таблиц.
+---------------------------------------------------------------
+REPAIR TABLE имя_таблицы
+Попробовать отремонтировать таблицу.
+Этот оператор тоже имеет
+несколько опций, но в обычном случае достаточно простого
+REPAIR TABLE. Если для ремонта таблиц, вдруг надумаете
+использовать дополнительные опции, советую сначала ознакомиться
+с документацией по их применению и возможным последствиям.)
+---------------------------------------------------------------
+# myisamchk /var/lib/mysql/company/users.MYI
+Ключи -r или -o используются для восстановления таблиц.
+Рекомендуется использовать ключ -r и если он не помог,
+использовать -o, который на порядок медленнее работает.
+---------------------------------------------------------------
+ALTER TABLE имя_таблицы ENGINE=InnoDB
+У оператора ALTER масса различных ключей, но в процессе
+администрирования сервера ( то есть не администрирования
+какого-то конкретного веб приложения ), я его применяю для смены
+движка MyISAM на InnoDB для некоторых таблиц.
+---------------------------------------------------------------
+DROP TABLE имя_таблицы
+Удалить таблицу.
+---------------------------------------------------------------
+FLUSH PRIVILEGES
+Перезагрузить системную таблицу привилегий.
+Mysql сервер кэширует
+в память результат выполнения таких операторов как: CREATE USER,
+GRANT, CREATE SERVER, INSTALL PLUGIN, и не освобождает память
+при выполнении обратных вариантов команд: DROP USER, REVOKE,
+DROP SERVER, UNINSTALL PLUGIN.
+---------------------------------------------------------------
+FLUSH HOSTS
+Очищает кэш хостов, например если у хоста сменился IP адрес или
+если вдруг появилось сообщение: Host 'имя_хоста' is blocked.
+---------------------------------------------------------------
+---размер базы---
+SELECT table_schema "database_name", sum( data_length + index_length )/1024/1024
+"Data Base Size in MB" FROM information_schema.TABLES GROUP BY table_schema;
+----------------------------------------------------------------------------- 
+---тип движка таблицы---
+select engine from information_schema.tables where table_name='имя_таблицы';
+-----------------------------------------------------------------------------
+---последний столбец---
+select * from имя_таблицы ORDER BY имя_столбца DESC LIMIT 1\G;
+-----------------------------------------------------------------------------
+---структура таблицы---
+show columns from имя_таблицы;
+----------------------------------------------------------------------------- 
+---создание реплики---
+stop slave;
+FLUSH TABLES WITH READ LOCK;
+SET GLOBAL read_only = ON;
+GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO имя_пользователя@адрес_сервера IDENTIFIED BY "оченьсложныйпароль"; - на мастере
+CHANGE MASTER TO MASTER_HOST = 'адрес_сервера_мастера', MASTER_USER = 'имя_пользователя', MASTER_PASSWORD = "оченьсложныйпароль", MASTER_CONNECT_RETRY = 5000, MASTER_LOG_FILE = "название_файло_бин-лога", MASTER_LOG_POS = позиция_в_бин-логе; - на реплике
+MASTER_LOG_FILE=relay_master_log_file и MASTER_LOG_POS=exec_master_log_pos - если с другой реплики но на одного мастера
+SET GLOBAL read_only = OFF;
+start slave;
+----------------------------------------------------------------------------- 
+---назначение всех прав/одновременное создание пользователя---
+GRANT ALL PRIVILEGES ON имя_базы.имя_таблицы TO имя_пользователя@адрес_сервера
+IDENTIFIED BY "оченьсложныйпароль";
+----------------------------------------------------------------------------- 
+---дамп базы---
+mysqldump 
+ -u имя_пользователя -pоченьсложныйпароль --add-drop-table --add-locks 
+-q -Q --disable-keys --extended-insert --default-character-set=cp1251 имя_базы
+имя_таблицы(если нужно) -r имя_файла.sql
+----------------------------------------------------------------------------- 
+---список юзеров---
+SELECT USER from mysql.user;
+----------------------------------------------------------------------------- 
+---просмотр прав---
+SHOW GRANTS FOR 'имя_пользователя'@'адрес_сервера';
+----------------------------------------------------------------------------- 
+---проверка баз типа myisam---
+myisamchk
+ --force --fast --update-state --key_buffer_size=18G 
+--sort_buffer_size=2000M --read_buffer_size=4M --write_buffer_size=4M /var/lib/mysql/*/*.MYI
+----------------------------------------------------------------------------- 
+---смена движка таблицы InnoDB --> MYISAM---
+sudo find /var/lib/mysql/имя_базы -iname '*.ibd' -printf '%f\n'
+mysql> use имя_базы;
+mysql> ALTER TABLE имя_таблицы ENGINE = MYISAM;
+----------------------------------------------------------------------------- 
+---вывод таблиц списоком---
+mysql -e 'SHOW TABLE STATUS FROM имя_базы'  -s  --skip-column-names | awk '{print $1 " " $7}'
+----------------------------------------------------------------------------- 
+---список процессов---
+SHOW FULL PROCESSLIST;
+----------------------------------------------------------------------------- 
+---пропустить ошибку при репликации---
+SET GLOBAL SQL_SLAVE_SKIP_COUNTER = 1;
+----------------------------------------------------------------------------- 
+---удалить столбец в таблице---
+ALTER TABLE имя_таблицы DROP имя_столбца;
+----------------------------------------------------------------------------- 
+---сортировать по столбцу---
+SELECT `имя_столбца` FROM `имя_таблицы` GROUP BY `имя_столбца`;
+---------------------------------------------------------------
+===========================
+Backup/Restore
+===========================
+
+mysqldump -u root -p dbname > dump.sql
+---------------------------------------------------------------
+--add-drop-table - добавляет команду DROP TABLE перед каждой
+командой CREATE TABLE
+--add-locks - добавляет команду LOCK TABLES перед выполнением
+и UNLOCK TABLE после выполнения каждого дампа таблицы
+--no-create-db, -n - не добавлять команду CREATE DATABASE,
+которая добавляется при использовании параметров --databases и --all-databases
+--no-data, -d - дампить только структуру таблиц
+--no-create-info, -t - не создавать команду CREATE TABLE
+--skip-comments - не выводить комментарии.
+--compact - использовать компактный формат
+--create-options - добавляет дополнительную информацию о таблице
+в команду CREATE TABLE: тип, значение AUTO_INCREMENT и т.д. Не
+нужные опции можно вырезать с помощью sed.
+--extended-insert, -e - применение команды INSERT с многострочным
+синтаксисом (повышает компактность и быстродействие операторов ввода)
+--tables - дампить только таблицы из списка, следующего за этим
+параметром, разделитель - пробел
+---------------------------------------------------------------
+mysql -uroot -p dbname1 < dump.sql
+---------------------------------------------------------------
+	InnoDB 
+---------------------------------------------------------------
+Cold Backups
+---------------------------------------------------------------
+If you can shut down the MySQL server, you can make a physical
+backup that consists of all files used by InnoDB to manage its
+tables. Use the following procedure:
+
+    Perform a slow shutdown of the MySQL server and make sure
+that it stops without errors.
+
+    Copy all InnoDB data files (ibdata files and .ibd files)
+into a safe place.
+
+    Copy all the .frm files for InnoDB tables to a safe place.
+
+    Copy all InnoDB log files (ib_logfile files) to a safe place.
+
+    Copy your my.cnf configuration file or files to a safe place.
+---------------------------------------------------------------
+slow shutdown
+---------------------------------------------------------------
+    A type of shutdown that does additional InnoDB flushing
+operations before completing. Also known as a clean shutdown.
+Specified by the configuration parameter innodb_fast_shutdown=0
+or the command SET GLOBAL innodb_fast_shutdown=0;. Although the
+shutdown itself can take longer, that time will be saved on the
+subsequent startup.  
+---------------------------------------------------------------
+	Logical Backups Using mysqldump
+---------------------------------------------------------------	
+In addition to physical backups, it is recommended that you
+regularly create logical backups by dumping your tables using
+mysqldump. A binary file might be corrupted without you noticing
+it. Dumped tables are stored into text files that are
+human-readable, so spotting table corruption becomes easier.
+Also, because the format is simpler, the chance for serious
+data corruption is smaller. mysqldump also has a
+--single-transaction option for making a consistent snapshot
+without locking out other clients.
+See Section 7.3.1, “Establishing a Backup Policy”.
+https://dev.mysql.com/doc/refman/5.7/en/backup-policy.html
+---------------------------------------------------------------	
+Full backup
+---------------------------------------------------------------	
+shell> mysqldump --all-databases --master-data --single-transaction > backup_sunday_1_PM.sql
+---------------------------------------------------------------	
+Replication works with InnoDB tables, so you can use MySQL
+replication capabilities to keep a copy of your database at
+database sites requiring high availability.
+See Section 14.19, “InnoDB and MySQL Replication”. 
+---------------------------------------------------------------
+Incremental  backup
+---------------------------------------------------------------	
+To make incremental backups, we need to save the incremental
+changes. In MySQL, these changes are represented in the binary
+log, so the MySQL server should always be started with the
+--log-bin option to enable that log. With binary logging
+enabled, the server writes each data change into a file while
+it updates data. 
+---------------------------------------------------------------	
+Each time it restarts, the MySQL server creates a new binary log
+file using the next number in the sequence. While the server is
+running, you can also tell it to close the current binary log
+file and begin a new one manually by issuing a FLUSH LOGS SQL
+statement or with a mysqladmin flush-logs command.
+---------------------------------------------------------------	
+ mysqldump also has an option to flush the logs. The .index file
+in the data directory contains the list of all MySQL binary logs
+in the directory. 
+---------------------------------------------------------------	
+shell> mysqldump --single-transaction --flush-logs --master-data=2 \
+         --all-databases > backup_sunday_1_PM.sql
+---------------------------------------------------------------	
+ After executing this command, the data directory contains a
+new binary log file, gbichot2-bin.000007, because the --flush-logs
+option causes the server to flush its logs. The --master-data
+option causes mysqldump to write binary log information to its
+output, so the resulting .sql dump file includes these lines:
+
+-- Position to start replication or point-in-time recovery from
+-- CHANGE MASTER TO MASTER_LOG_FILE='gbichot2-bin.000007',MASTER_LOG_POS=4;
+---------------------------------------------------------------	
+ Because the mysqldump command made a full backup, those lines
+mean two things:
+
+    The dump file contains all changes made before any changes
+written to the gbichot2-bin.000007 binary log file or higher.
+
+    All data changes logged after the backup are not present in
+the dump file, but are present in the gbichot2-bin.000007 binary
+log file or higher. 
+---------------------------------------------------------------	
+ On Monday at 1 p.m., we can create an incremental backup by
+flushing the logs to begin a new binary log file. For example,
+executing a mysqladmin flush-logs command creates
+gbichot2-bin.000008. All changes between the Sunday 1 p.m. full
+backup and Monday 1 p.m. will be in the gbichot2-bin.000007 file.
+This incremental backup is important, so it is a good idea to
+copy it to a safe place. (For example, back it up on tape or
+DVD, or copy it to another machine.) On Tuesday at 1 p.m.,
+execute another mysqladmin flush-logs command. All changes
+between Monday 1 p.m. and Tuesday 1 p.m. will be in the
+gbichot2-bin.000008 file (which also should be copied somewhere
+safe).
+
+The MySQL binary logs take up disk space. To free up space,
+purge them from time to time. One way to do this is by deleting
+the binary logs that are no longer needed, such as when we make
+a full backup: 
+---------------------------------------------------------------	
+shell> mysqldump --single-transaction --flush-logs --master-data=2 \
+         --all-databases --delete-master-logs > backup_sunday_1_PM.sql
+---------------------------------------------------------------	
+Note 
+Deleting the MySQL binary logs with mysqldump --delete-master-logs
+can be dangerous if your server is a replication master server,
+because slave servers might not yet fully have processed the
+contents of the binary log. The description for the PURGE BINARY
+LOGS statement explains what should be verified before deleting
+the MySQL binary logs.
+See Section 13.4.1.1, “PURGE BINARY LOGS Syntax”. 
+---------------------------------------------------------------	
+Here's a scrip i wrote to backup my db, using a user that's not "mysql".
+
+There's an entry in the sudoers file to allow the user to read the log files
+
+The backup (mysql) user has "super,reload,all" privileges + its password in .my.cnf
+
+The backup path is on a NAS filesystem.
+
+What's missing is a function to remove old full backups if needed.
+
+------------------------------------------------------
+#!/bin/bash
+
+MODE=$1
+MYSQLUSER=backup
+BINLOGPATH=/var/log/mysql
+BINLOGNAME=mysql-bin
+ARCHIVEPATH=/usr/app/security/var/data/backups/mysql/
+
+setRead() {
+# change properties on binlog path
+sudo chmod o+rx $BINLOGPATH
+sudo chmod o+r $BINLOGPATH/*
+}
+
+resetRead() {
+# restore properties on binlog path
+sudo chmod o-r $BINLOGPATH/*
+sudo chmod o-rx $BINLOGPATH
+}
+
+copyBinlogs() {
+# copy binlogs to archive dir
+echo "Copying binlogs"
+setRead;
+for FILE in `cat $BINLOGPATH/$BINLOGNAME.index`
+do
+SFILE=(${FILE/*\//})
+if [ ! -f $ARCHIVEPATH/$SFILE.gz ]
+then
+echo "- binlog $SFILE"
+cp $FILE $ARCHIVEPATH
+gzip $ARCHIVEPATH/$SFILE
+fi
+done
+resetRead;
+}
+
+saveBinlogs() {
+# move latest binlogs to savedir
+echo "Saving binlogs"
+SAVEDIR=`date +%Y%m%d`
+echo $SAVEDIR
+mkdir -p $ARCHIVEPATH/$SAVEDIR
+mv $ARCHIVEPATH/*.gz $ARCHIVEPATH/$SAVEDIR
+}
+
+# --- Main ---
+case "$MODE" in
+
+'full')
+# Weekly backup
+# - copy all bin logs to backup directory
+# - clean path of backup directory
+echo "Weekly backup"
+DATE=`date +%Y%m%d`
+mysqldump -u $MYSQLUSER --single-transaction --flush-logs --master-data=2 \
+--all-databases --delete-master-logs | gzip > $ARCHIVEPATH/$SAVEDIR/full-$DATE.sql.gz
+copyBinlogs;
+saveBinlogs;
+;;
+
+'incremental')
+# Daily backup
+# - flush logs
+# - copy all bin logs to backup directory if not already done
+echo "Mysql daily backup"
+mysqladmin -u $MYSQLUSER flush-logs
+copyBinlogs;
+;;
+
+*)
+echo "Usage: mysql_backup [full|incremental]"
+;;
+
+esac
+------------------------------------------------------
+
+---------------------------------------------------------------	
+
+---------------------------------------------------------------	
+
+---------------------------------------------------------------	
+
+---------------------------------------------------------------	
+
+---------------------------------------------------------------	
+===========================
+Смена пароля
+===========================
+Себе
+mysql>SET PASSWORD = PASSWORD('пароль')
+Пользователю
+mysql>  SET PASSWORD FOR логин@localhost = PASSWORD('пароль');
+mysql>  SET PASSWORD FOR логин@"%" = PASSWORD('пароль');
+или
+mysql>  UPDATE mysql.user SET Password=PASSWORD('пароль') WHERE User='логин' AND Host='localhost';
+mysql>  FLUSH PRIVILEGES;
+mysql>  SHOW GRANTS FOR 'admin_db'@'localhost';
+mysql>  SHOW GRANTS FOR 'admin_db'@'%';
+
+---------------------------------------------------------------
+===========================
+Перекодировка Charset:
+===========================
+Поиск текста в файле и замена
+Дамп для конвертирования
+1. mysqldump
+Конвертирование
+2. sed -i 's/CHARSET=cp1251/CHARSET=utf8/g' /home/admin/admin_backups/utf8/medtehnika_dev.sql 
+   sed -i 's/CHARSET=cp1251/CHARSET=utf8/g' /home/admin/admin_backups/utf8/medtehnika_b.sql 
+   sed -i 's/CHARSET=latin1/CHARSET=utf8/g' /home/admin/admin_backups/utf8/medtehnika_b.sql 
+Тестовое восстановление
+3. mysql -u da_admin -p aaa < /home/admin/admin_backups/utf8/medtehnika_dev.sql 
+   mysql -u da_admin -p aaa < /home/admin/admin_backups/utf8/medtehnika_b.sql 
+Восстановление, можно через phpMyAdmin
+4. mysql -u da_admin -p7S7L9tA7Du medtehnika_b < /home/admin/admin_backups/utf8/medtehnika_b.sql 
+   mysql -u da_admin -p7S7L9tA7Du medtehnika_dev < /home/admin/admin_backups/utf8/medtehnika_dev.sql 
+---------------------------------------------------------------
+===========================
+Восстановление root доступа
+===========================
+service mysqld stop
+systemctl stop mariadb
+
+mysqld_safe --skip-grant-tables &
+mysql
+mysql> UPDATE mysql.user SET Password=PASSWORD('secret') WHERE User='root';
+mysql> FLUSH PRIVILEGES;
+mysql> \q
+
+systemctl start mariadb
+service mysqld restart
+---------------------------------------------------------------
+======================================
+Рекомендации настройки Сервера БД
+======================================
+Tunner for fast working mysql
+perl ~/mysqltuner.pl
+---------------------------------------------------------------
+===============================================================
+innodb bitrix
+---------------------------------------------------------------
+my.cnf
+---------------------------------------------------------------
+[mysqld]
+
+skip-name-resolve	= 1
+query_cache_size        = 64M
+query_cache_type        = 2
+join_buffer_size	= 8M
+innodb_log_file_size	= 1G
+#
+
+max_connections         = 2048
+query_cache_limit       = 8M
+max_allowed_packet      = 128M
+
+innodb_buffer_pool_size         = 8G
+innodb_buffer_pool_instances    = 8
+innodb_log_buffer_size          = 128M
+innodb_file_per_table           = 1
+innodb_flush_log_at_trx_commit  = 2
+innodb_additional_mem_pool_size = 64M
+innodb_flush_method             = O_DIRECT
+
+transaction-isolation           =  READ-COMMITTED
+max-heap-table-size             = 300M
+tmp-table-size                  = 300M
+
+key_buffer_size                 = 128M
+sort_buffer_size                = 1M
+read_buffer_size                = 1M
+read_rnd_buffer_size            = 1M
+
+thread_stack                    = 1M
+thread_cache_size		= 32
+table_open_cache		= 4096
+
+[safe_mysqld]
+err-log=/var/log/mysqld.log
+open_files_limit=8192
+
+[mysqldump]
+quick
+max_allowed_packet=16M
+
+[client]
+default-character-set=utf8
+---------------------------------------------------------------
+show variables like 'innodb_log_file_size';
+mysql> SET GLOBAL innodb_fast_shutdown = 1;
+# mv /var/lib/mysql/ib_logfile0 /var/lib/mysql/ib_logfile0.bak
+# mv /var/lib/mysql/ib_logfile1 /var/lib/mysql/ib_logfile1.bak
+---------------------------------------------------------------
+===============================================================
+---------------------------------------------------------------
+===============================================================
+###########
+#[Warning] 'user' entry 'root@localhost' has both a password
+and an authentication plugin specified. The password will be
+ignored.
+###########
+===============================================================
+It is normal, if by saying "accessing the DB via mysql -u root -p
+works fine" you mean that you are running it while being a system
+root (or under sudo). You should not be able to do it as an ordinary user.
+Packages generated by Ubuntu by default have unix_socket
+authentication for the local root. To check, run 
+---------------------------------------------------------------
+SELECT user, host, plugin FROM mysql.user;
+---------------------------------------------------------------
+You should see unix_socket in the plugin column for root@localhost.
+If you want to use the password authentication instead, run
+---------------------------------------------------------------
+UPDATE mysql.user SET plugin = '' WHERE plugin = 'unix_socket';
+FLUSH PRIVILEGES;
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+	Replication
+-----------------------------------------------------------------------------
+	Master
+-----------------------------------------------------------------------------
+/etc/my.cnf
+[mysqld]
+log-bin=mysql-bin
+server-id=1
+-----------------------------------------------------------------------------
+Note
+-----------------------------------------------------------------------------
+The following options have an impact on this procedure:
+
+    if you omit server-id (or set it explicitly to its default value of 0),
+the master refuses any connections from slaves.
+
+    For the greatest possible durability and consistency in a replication setup
+using InnoDB with transactions, you should use innodb_flush_log_at_trx_commit=1
+and sync_binlog=1 in the master my.cnf file.
+
+    Ensure that the skip-networking option is not enabled on your replication
+master. If networking has been disabled, the slave cannot communicate with the
+master and replication fails. 
+-----------------------------------------------------------------------------
+	Slave
+-----------------------------------------------------------------------------
+/etc/my.cnf
+[mysqld]
+server-id=2
+-----------------------------------------------------------------------------
+ If you are setting up multiple slaves, each one must have a unique server-id
+value that differs from that of the master and from any of the other slaves.
+Note
+
+If you omit server-id (or set it explicitly to its default value of 0), the
+slave refuses to connect to a master.
+
+You do not have to enable binary logging on the slave for replication to be
+set up. However, if you enable binary logging on the slave, you can use the
+slave's binary log for data backups and crash recovery, and also use the
+slave as part of a more complex replication topology. For example, where this
+slave then acts as a master to other slaves. 
+-----------------------------------------------------------------------------
+mysql> CHANGE MASTER TO
+    ->     MASTER_HOST='master_host_name',
+    ->     MASTER_USER='replication_user_name',
+    ->     MASTER_PASSWORD='replication_password',
+    ->     MASTER_LOG_FILE='recorded_log_file_name',
+    ->     MASTER_LOG_POS=recorded_log_position;
+-----------------------------------------------------------------------------
+Note
+-----------------------------------------------------------------------------
+Replication cannot use Unix socket files. You must be able to connect to the
+master MySQL server using TCP/IP.
+-----------------------------------------------------------------------------
+Setting Up Replication with Existing Data
+-----------------------------------------------------------------------------
+	Start the slave, using the --skip-slave-start option so that
+replication does not start.
+
+Import the dump file:
+shell> mysql < fulldb.dump
+-----------------------------------------------------------------------------
+Configure the slave with the replication coordinates from the master. This
+tells the slave the binary log file and position within the file where
+replication needs to start. Also, configure the slave with the login
+credentials and host name of the master
+-----------------------------------------------------------------------------
+mysql> START SLAVE;
+-----------------------------------------------------------------------------
+After you have performed this procedure, the slave connects to the master and
+replicates any updates that have occurred on the master since the snapshot was
+taken. 
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+mysql> CREATE USER 'repl'@'%.mydomain.com' IDENTIFIED BY 'slavepass';
+mysql> GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%.mydomain.com';
+mysql> FLUSH TABLES WITH READ LOCK;
+mysql > SHOW MASTER STATUS;
+-----------------------------------------------------------------------------
+Warning
+-----------------------------------------------------------------------------
+Leave the client from which you issued the FLUSH TABLES statement running so
+that the read lock remains in effect. If you exit the client, the lock is released.
+-----------------------------------------------------------------------------
+	Choosing a Method for Data Snapshots
+-----------------------------------------------------------------------------
+Creating a Data Snapshot Using mysqldump
+-----------------------------------------------------------------------------
+    Use the mysqldump tool to create a dump of all the databases you want to
+replicate. This is the recommended method, especially when using InnoDB.
+
+    If your database is stored in binary portable files, you can copy the raw
+data files to a slave. This can be more efficient than using mysqldump and
+importing the file on each slave, because it skips the overhead of updating
+indexes as the INSERT statements are replayed. With storage engines such as
+InnoDB this is not recommended.
+-----------------------------------------------------------------------------
+shell> mysqldump --all-databases --master-data > dbdump.db
+-----------------------------------------------------------------------------
+Note
+-----------------------------------------------------------------------------
+If you do not use --master-data, then it is necessary to lock all tables in a
+separate session manually. See Section 16.1.2.3, “Obtaining the Replication
+Master Binary Log Coordinates”.
+
+    Exclude all the tables in the database using --ignore-table option.
+
+    Name only those databases which you want dumped using the --databases option.
+-----------------------------------------------------------------------------
+Creating a Data Snapshot Using Raw Data Files
+-----------------------------------------------------------------------------
+ If you use InnoDB tables, you can use the mysqlbackup command from the MySQL
+Enterprise Backup component to produce a consistent snapshot. This command
+records the log name and offset corresponding to the snapshot to be used on
+the slave. MySQL Enterprise Backup is a commercial product that is included
+as part of a MySQL Enterprise subscription. See Section 29.2, “MySQL Enterprise
+Backup Overview” for detailed information.
+
+This method also does not work reliably if the master and slave have different
+values for ft_stopword_file, ft_min_word_len, or ft_max_word_len and you are
+copying tables having full-text indexes.
+
+Assuming the above exceptions do not apply to your database, use the cold
+backup technique to obtain a reliable binary snapshot of InnoDB tables: do
+a slow shutdown of the MySQL Server, then copy the data files manually.
+
+To create a raw data snapshot of MyISAM tables when your MySQL data files
+exist on a single file system, you can use standard file copy tools such as
+cp or copy, a remote copy tool such as scp or rsync, an archiving tool such
+as zip or tar, or a file system snapshot tool such as dump. If you are
+replicating only certain databases, copy only those files that relate to
+those tables. For InnoDB, all tables in all databases are stored in the
+system tablespace files, unless you have the innodb_file_per_table option enabled.
+-----------------------------------------------------------------------------
+The following files are not required for replication:
+-----------------------------------------------------------------------------
+    Files relating to the mysql database.
+
+    The master info repository file, if used (see Section 16.2.4, “Replication Relay and Status Logs”).
+
+    The master's binary log files.
+
+    Any relay log files. 
+-----------------------------------------------------------------------------
+Depending on whether you are using InnoDB tables or not, choose one of the following:
+-----------------------------------------------------------------------------
+If you are using InnoDB tables, and also to get the most consistent results
+with a raw data snapshot, shut down the master server during the process, as
+follows:
+-----------------------------------------------------------------------------
+    Acquire a read lock and get the master's status. See Section 16.1.2.3,
+ “Obtaining the Replication Master Binary Log Coordinates”.
+
+    In a separate session, shut down the master server:
+
+    shell> mysqladmin shutdown
+
+    Make a copy of the MySQL data files. The following examples show common
+ways to do this. You need to choose only one of them:
+
+    shell> tar cf /tmp/db.tar ./data
+    shell> zip -r /tmp/db.zip ./data
+    shell> rsync --recursive ./data /tmp/dbdata
+-----------------------------------------------------------------------------
+    Restart the master server. 
+-----------------------------------------------------------------------------
+If you are not using InnoDB tables, you can get a snapshot of the system from
+a master without shutting down the server as described in the following steps:
+-----------------------------------------------------------------------------
+    Acquire a read lock and get the master's status. See Section 16.1.2.3,
+“Obtaining the Replication Master Binary Log Coordinates”.
+
+    Make a copy of the MySQL data files. The following examples show common
+ways to do this. You need to choose only one of them:
+
+    shell> tar cf /tmp/db.tar ./data
+    shell> zip -r /tmp/db.zip ./data
+    shell> rsync --recursive ./data /tmp/dbdata
+
+    In the client where you acquired the read lock, release the lock:
+
+    mysql> UNLOCK TABLES;
+-----------------------------------------------------------------------------
+Once you have created the archive or copy of the database, copy the files to
+each slave before starting the slave replication process. 
+-----------------------------------------------------------------------------
+	Switching Masters During Failover
+-----------------------------------------------------------------------------
+Web Client -> Master <- Slave{1,2,3}
+-----------------------------------------------------------------------------
+Web Client -> Master==Slave1 <- Slave{2,3},NotMaster
+-----------------------------------------------------------------------------
+	Slave1
+-----------------------------------------------------------------------------
+Slaves should be run with the --log-bin option, and if not using GTIDs then
+they should also be run without --log-slave-updates. In this way, the slave
+is ready to become a master without restarting the slave mysqld.
+-----------------------------------------------------------------------------
+Web Client switch to new Master==Slave1
+
+Slave1
+
+/etc/my.cnf
+
+[mysqld]
+server-id=2
+log-bin=mysql-bin
+
+mysql> STOP SLAVE; and 
+mysql> RESET MASTER;
+
+
+Slave2,3
+mysql> STOP SLAVE; and 
+mysql> CHANGE MASTER TO MASTER_HOST='Slave1' (user, password, port)
+----------------------------------------------------------------------------
+Make sure that all slaves have processed any statements in their relay log.
+On each slave, issue STOP SLAVE IO_THREAD, then check the output of
+SHOW PROCESSLIST until you see Has read all relay log. When this is true for
+all slaves, they can be reconfigured to the new setup. On the slave Slave 1
+being promoted to become the master, issue STOP SLAVE and RESET MASTER. 
+-----------------------------------------------------------------------------
+ On the other slaves Slave 2 and Slave 3, use STOP SLAVE and CHANGE MASTER TO
+MASTER_HOST='Slave1' (where 'Slave1' represents the real host name of Slave 1).
+To use CHANGE MASTER TO, add all information about how to connect to Slave 1
+from Slave 2 or Slave 3 (user, password, port). When issuing the CHANGE MASTER
+TO statement in this, there is no need to specify the name of the Slave 1 binary
+log file or log position to read from, since the first binary log file and
+position 4, are the defaults. Finally, execute START SLAVE on Slave 2 and Slave 3.
+
+Once the new replication setup is in place, you need to tell each Web Client
+to direct its statements to Slave 1. From that point on, all updates statements
+sent by Web Client to Slave 1 are written to the binary log of Slave 1, which
+then contains every update statement sent to Slave 1 since Master turnoff. 
+-----------------------------------------------------------------------------
+When Master becomes available again, you should make it a slave of Slave 1.
+To do this, issue on Master the same CHANGE MASTER TO statement as that issued
+on Slave 2 and Slave 3 previously. Master then becomes a slave of S1ave 1 and
+picks up the Web Client writes that it missed while it was offline.
+
+To make Master a master again, use the preceding procedure as if Slave 1 was
+unavailable and Master was to be the new master. During this procedure, do
+not forget to run RESET MASTER on Master before making Slave 1, Slave 2, and
+Slave 3 slaves of Master. If you fail to do this, the slaves may pick up stale
+ writes from the Web Client applications dating from before the point at which
+Master became unavailable.
+
+You should be aware that there is no synchronization between slaves, even when
+they share the same master, and thus some slaves might be considerably ahead
+of others. This means that in some cases the procedure outlined in the previous
+example might not work as expected. In practice, however, relay logs on all
+slaves should be relatively close together.
+----------------------------------------------------------------------------
+dynamic DNS
+----------------------------------------------------------------------------
+One way to keep applications informed about the location of the master is to
+have a dynamic DNS entry for the master. With bind you can use nsupdate to
+update the DNS dynamically. 
+----------------------------------------------------------------------------
+Алгоритм репликации
+----------------------------------------------------------------------------
+1. Узнать master_log_file = "mysql-bin.000001", master_log_pos = 11716;
+затем отановить мускул на запись на Мастере,
+ 
+2. Зделать снапшот раздела с DB
+
+3. Запустить DB на запись
+
+4. Перенести нужные бызы и базы в которых есть иннодб на подчиненный сервер
+
+5. Отредактировать конфиг и права на папки и файлов на подчиненном сервере 
+
+6. Запустить MySql на подчиненном сервере
+
+7. Запустить команду настройки репликации и какой логин и пароль для этого использовать
+
+8. Затем запустить mysql>start slave;
+-----------------------------------------------------------------------------
+mysql> SHOW MASTER STATUS\G
+mysql> show slave status\G
+mysql>change master to master_host = "192.168.1.48", master_user = "root", master_password="Pwd1980", master_log_file = "mysql-bin.000004", master_log_pos = 106;
+mysql>start slave;
+    SHOW BINARY LOGS
+    SHOW BINLOG EVENTS
+    SHOW MASTER STATUS
+    SHOW SLAVE HOSTS 
+ RESET MASTER
+-----------------------------------------------------------------------------
+lvdisplay
+pvdisplay
+vgdisplay
+
+fdisk -l
+df -h
+
+проверка CRON
+-----------------------------------------------------------------------------
+NFS
+-----------------------------------------------------------------------------
+mount device dir - монтирование/подключение файлового устройства device в
+каталог dir (запуск без параметров выводит список уже смонтированных устройств)
+
+    -a - монтирование всех файловых систем, указанных в /etc/fstab (включая те,
+которые имеют параметр noauto)
+    -t fstype - указание типа файловой системы (ntfs, nfs, ext3 и т.п.)
+    -h - помощь
+    -r - монтирование в режиме только чтения
+    -o parametr=znachen- устанавливает параметры монтирования:
+        conv=auto - автоконвертирование текста их формата MSDOS в UNIX (замена
+символа конца строки CR-LF на LF)
+        ro - монтирование в режиме только для чтения
+
+umount dir/mount_point - размонтирует файловые системы
+
+    -a - размонтирование всех файловых систем, указанных в /etc/fstab, кроме корневой
+
+FILES ~ # mount -t nfs archiv:/archiv-small /archivs/archiv-small
+FILES ~ # mount -t nfs -o ro archiv:/archiv-big /archivs/archiv-big
+FILES ~ # mount
+.......
+archiv:/archiv-small on /archivs/archiv-small type nfs (rw,addr=10.0.0.6)
+archiv:/archiv-big on /archivs/archiv-big type nfs (ro,addr=10.0.0.6)
+
+FILES ~ # cat /etc/fstab | grep nfs
+archiv:/archiv-small     /archivs/archiv-small  nfs     rw,timeo=4,rsize=16384,wsize=16384   0       0
+nfs-server:/archiv-big   /archivs/archiv-big    nfs     rw,timeo=50,hard,fg                  0       0
+
+# mount.nfs 192.168.1.1:/home/nfs3 /mnt/nfs3
+# mount.nfs4 192.168.1.1:/ /mnt/nfs4
+# mount.nfs4 192.168.1.1:/part1 /mnt/nfs4/part1
+
+-----------------------------------------------------------------------------
+Создание репликации
+-----------------------------------------------------------------------------
+1. mysql@master> FLUSH TABLES WITH READ LOCK;
+SET GLOBAL read_only=ON;
+
+1.2 mysql> show master status;
+File: mysql-bin.0*
+Position: 98
+
+2. lvcreate -L2G -s -n snap002 /dev/mapper/vg_snap-lv_test01
+
+lvdisplay
+
+3. UNLOCK TABLES;
+SET GLOBAL read_only=OFF;
+
+4. mysql> show master status;
+ master_log_file = "mysql-bin.000001", master_log_pos = 11716;
+
+6. mount /dev/vg_snap/snap002 /mnt/snap
+
+7.NFS в /etc/exports
+/mnt/snap 192.168.1.0/255.255.255.0(rw,no_root_squash)
+
+exportfs -r
+
+service rpcbind restart
+service nfs restart
+
+chkconfig rpcbind on
+chkconfig nfs on
+
+rpcinfo -p localhost | grep nfs
+
+7. mount.nfs 192.168.1.48:/mnt/snap /mnt/snap/
+
+8. Проверка my.cnf
+
+9. Очищаем папку /var/lib/mysq – rm -R /var/lib/mysql/*
+
+9. Копируем c NFS snapshot DB в /var/lib/mysql/
+
+10. Выставляем владельца
+
+chown -RP mysql:mysql /var/lib/mysql
+restorecon -R -v /var/lib/mysql
+
+11. Если редактировали my.cnf service mysqld stop, service mysqld start
+
+12. mysql>change master to master_host = "192.168.1.48", master_user = "root", master_password="Pwd1980", master_log_file = "mysql-bin.000004", master_log_pos = 106;
+
+mysql>start slave;
+mysql>show slave status;
+
+13. Отключиться от NFS сервера. На NFS сервере
+
+14. sevice nfs stop.
+15. umount /mnt/mysqlsnapshot/
+16. lvremove -f /dev/vg_db-1/mysqlsnapshot
+-----------------------------------------------------------------------------
+Пример конфигурации Мастера
+-----------------------------------------------------------------------------
+[mysqld]
+
+#
+# * Basic Settings
+#
+explicit_defaults_for_timestamp
+skip-external-locking
+innodb_file_per_table
+#relay_log_recovery
+
+low_priority_updates = 1
+
+relay-log-info-repository = TABLE
+master-info-repository = TABLE
+
+slave_parallel_workers = 4
+
+sql_mode = NO_ENGINE_SUBSTITUTION
+
+#
+# * Fine Tuning
+#
+key_buffer_size         = 8G
+join_buffer_size        = 4M
+max_allowed_packet      = 16M
+thread_stack            = 192K
+thread_cache_size       = 64
+open_files_limit        = 12000
+
+# This replaces the startup script and checks MyISAM tables if needed
+# the first time they are touched
+myisam-recover-options  = BACKUP
+myisam_sort_buffer_size = 8G
+read_rnd_buffer_size    = 1M
+max_connections         = 400
+table_open_cache        = 2048
+table_definition_cache  = 2048
+
+max_heap_table_size     = 20G
+tmp_table_size          = 1G
+
+#
+# * Query Cache Configuration
+#
+query_cache_type        = 1
+query_cache_limit       = 1M
+query_cache_size        = 2048M
+
+innodb_buffer_pool_size = 32G
+innodb_log_file_size    = 512M
+innodb_log_buffer_size  = 16M
+innodb_flush_log_at_trx_commit = 2
+innodb_thread_concurrency = 8
+innodb_flush_method     = O_DIRECT
+innodb_lock_wait_timeout = 120
+
+innodb_sort_buffer_size = 512M
+innodb_online_alter_log_max_size = 2G
+
+#
+# * Logging and Replication
+#
+#==================MASTER==================
+server-id                = 1
+log_bin                  = mysqld-bin
+expire_logs_days         = 3
+max_binlog_size          = 1G
+binlog-format            = MIXED
+#==================SLAVE===================
+relay_log                = mysqld-relay-bin
+replicate-wild-do-table  = billing.%
+replicate-wild-do-table  = billing_archive.%
+replicate-wild-do-table  = billing_ua.%
+replicate-wild-do-table  = common.%
+replicate-wild-do-table  = context_motor.%
+replicate-wild-do-table  = daily_logs.%
+replicate-wild-do-table  = gearman.%
+replicate-wild-do-table  = geo.%
+replicate-wild-do-table  = irr.%
+replicate-wild-do-table  = links_buying_common.%
+replicate-wild-do-table  = links_buying_ru.%
+replicate-wild-do-table  = links_buying_ua.%
+replicate-wild-do-table  = market.%
+replicate-wild-do-table  = mysql.%
+replicate-wild-do-table  = sso.%
+#replicate-wild-do-table  = tmp_table.%
+replicate-wild-do-table  = top_analyser.%
+#==========================================
+
+log_error = /var/log/mysql/error.log
+
+slow_query_log_file = /var/log/mysql/mysql-slow.log
+slow_query_log = 1
+long_query_time = 5
+#log-queries-not-using-indexes
+
+[mysqladmin]
+user = log
+password = 2wsxcvnm1QAZ3EDC4rfv
+-----------------------------------------------------------------------------
+Master
+-----------------------------------------------------------------------------
+my.cnf
+-----------------------------------------------------------------------------
+binlog-format=ROW
+
+Бывает трех видов — STATEMENT, MIXED и ROW
+В двух словах — statement пишет в бинлог по сути sql запросы. Преимущества —
+старый формат, оттестированный, лог небольшой, можно посмотреть запросы.
+Недостатки — проблемы с функциями и триггерами, запросы вида update user set
+a=1 order by rand(), а так же еще некоторые могут некорректно отрабатываться.
+ROW если совсем упрощенно — пишет в логи измененные бинарные данные.
+Преимущества — отлично логируются все виды запросов. Недостатки — огромный лог.
+Ну и mixed — промежуточный формат, который старается использовать statement,
+когда возможно, а когда нет — row. Говорят, что глючит на каких то очень
+сложных запросах. Именно его я и рискнул использовать
+-----------------------------------------------------------------------------
+binlog-checksum=crc32
+Новая фича mysql5.6, вроде как ускоряет работу бинлога
+
+gtid-mode=on
+Собственно и включает ту самую GTID mode репликацию
+
+enforce-gtid-consistency=true
+Запрещает все, что может поломать транзакции.
+
+log-slave-updates=true
+В родной документации написано: указывает подчиненному серверу, чтобы тот вел
+записи об обновлениях, происходящих на подчиненном сервере, в двоичном журнале.
+По умолчанию эта опция выключена. Ее следует включить, если требуется
+организовать подчиненные серверы в гирляндную цепь.
+
+server-id = 1
+Уникальный номер для каждого сервера
+
+ну и не забываем указать что именно мы будем реплицировать —
+replicate-do-db = mybase
+replicate-do-table=mybase.mytable1
+replicate-do-table=mybase.mytable2
+
+После этого необходимо создать пользователя mysql с правами репликации.
+Например так
+GRANT replication slave ON *.* TO «replication»@'192.168.1.102' IDENTIFIED BY 'password';
+
+На этом настройка мастера закончена. Вливаем дамп и в бой )
+-----------------------------------------------------------------------------
+Слейв
+-----------------------------------------------------------------------------
+В простейшем варианте на слейв можно скопировать тот же конфиг, что и на мастере,
+единственное что — нужно сменить server_id, например на 2.
+
+Перезапускаем слейв, и запускаем репликацию
+
+change master to master_host='192.168.1.1", master_auto_position=1,
+Master_User=’replication’, master_password=’password';
+start slave;
+
+и любуемся
+
+show slave status \G
+-----------------------------------------------------------------------------
+
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
