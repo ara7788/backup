@@ -197,7 +197,7 @@ alternatives
 L9.MONITORING
 ===============
 -----------------------------------------------------------------------------
-Nagios (Check_MK)
+Nagios
 -----------------------------------------------------------------------------
 Supervisord
 -----------------------------------------------------------------------------
@@ -208,6 +208,8 @@ rsync
 Veeam
 -----------------------------------------------------------------------------
 Мониторинг Сети
+-----------------------------------------------------------------------------
+Мониторинг системы
 -----------------------------------------------------------------------------
 ===============
 L10.SCRIPTING
@@ -22918,6 +22920,1058 @@ L9.MONITORING
 -----------------------------------------------------------------------------
 Nagios (Check_MK)
 -----------------------------------------------------------------------------
+Активный – это когда сама система мониторинга посылает запросы к удаленному
+хосту и получает информацию.
+
+Пассивный – это когда специальная внешняя программа присылают всю необходимую
+информацию в Nagios. 
+-----------------------------------------------------------------------------
+Nagios <- NSCA <- send_nsca <- Remote Application
+	Sever		Remote PC
+-----------------------------------------------------------------------------
+		     SSL
+Nagios -> check_nrpe -> NRPE -> {check_disk,load,http -> Local resource} -> Monitoring Server
+	Sever		Remote PC
+-----------------------------------------------------------------------------
+/etc/nagios/
+├── commands
+│   └── commands.cfg
+├── contactgroups
+│   └── contactgroups.cfg
+├── contacts
+│   ├── contact1.cfg
+│   └── generic.cfg
+├── dependencies.cfg
+├── escalations.cfg
+├── hostgroups
+│   └── hostgroups.cfg
+├── hosts
+│   ├── cassandra.cfg
+│   ├── couchbase.cfg
+│   └── generic.cfg
+├── servicegroups
+│   └── .gitkeep
+├── services
+│   ├── backends.cfg
+│   └── generic.cfg
+└── timeperiods
+    └── timeperiods.cfg
+-----------------------------------------------------------------------------
+# yum -y install wget
+# rpm -Uvh https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-10.noarch.rpm
+# yum -y install nagios nagios-plugins-all
+-----------------------------------------------------------------------------
+# systemctl enable nagios
+# systemctl enable httpd
+# systemctl start nagios
+# systemctl start httpd
+-----------------------------------------------------------------------------
+Каталоги с ключевыми файлами Nagios:
+-----------------------------------------------------------------------------
+/etc/nagios/ Конфигурационные файлы Nagios;
+/usr/bin/nagiostats Программа показывающая статистику работы Nagios;
+/etc/init.d/nagios Скрипт запуска/выключения сервиса;
+/etc/httpd/conf.d/
+nagios.conf
+Файл подключения к Apache;
+/usr/share/doc/ Документация;
+/usr/lib/nagios/
+/usr/share/nagios/
+Движок Nagios;
+/var/log/nagios/ Логи.
+-----------------------------------------------------------------------------
+Конфигурационные файлы Nagios (все они расположены в /etc/nagios/)
+-----------------------------------------------------------------------------
+cgi.conf Авторизация - к чему будет доступ для конкретного пользователя.
+Задаем права доступа пользователям, некоторые другие опции;
+
+commands.cfg С какими параметрами выполняются команды, команды используем в
+localhost.cfg в директиве check_command;
+
+localhost.cfg Файл описывающий какие сервера и как мониторим. Описываем режим
+проверки хостов и уведомления персонала;
+
+nagios.cfg Файл настройки самого сервера Nagios. Файл задает
+параметры как Nagios будет функционировать;
+
+passwd Файл с логинами и паролями пользователей Nagios
+(заполняем с помощью htpasswd);
+
+private/resource.cfg В переменной $USER1 сохраняем путь к каталогу с
+нашими плагинами. Переменная активно используется
+в commands.cfg Все это для того чтобы напрямую не
+давать доступ CGI-программам.
+-----------------------------------------------------------------------------
+Файл /etc/httpd/conf.d/nagios.conf
+-----------------------------------------------------------------------------
+ScriptAlias /nagios/cgi-bin/ /usr/lib/nagios/cgi-bin/
+<Directory /usr/lib/nagios/cgi-bin/>
+	Options ExecCGI
+		Order Allow,Deny
+		Allow From All
+	AuthType Basic
+	AuthUserFile /etc/nagios/passwd
+	AuthName «nagios»
+	Require valid-user
+</Directory>
+
+Alias /nagios/ /usr/share/nagios/html/
+<Directory /usr/share/nagios/html/>
+	Options None
+		Order Allow,Deny
+		Allow From All
+	AuthType Basic
+	AuthUserFile /etc/nagios/passwd
+	AuthName «nagios»
+	Require valid-user
+</Directory>
+-----------------------------------------------------------------------------
+Примеры настройки для SSL-сервера есть в том же файле, отредактируйте
+их по аналогии с обычным режимом работы Apache.
+-----------------------------------------------------------------------------
+Заведем пользователя nagiosadmin, используя этот аккаунт мы будем
+попадать в веб-интерфейс Nagios
+# htpasswd -c /etc/nagios/passwd nagiosadmin
+-----------------------------------------------------------------------------
+Конфигурационный файл /etc/nagios/cgi.cfg
+-----------------------------------------------------------------------------
+# CGI.CFG - Sample CGI Configuration File for Nagios 2.12
+# MAIN CONFIGURATION FILE
+# Здесь указываем где искать главный конфигурационный файл
+main_config_file=/etc/nagios/nagios.cfg
+# HTML PATH
+# Здесь указываем где расположены html-файлы Nagios
+physical_html_path=/usr/share/nagios/share
+# URL HTML PATH
+# Значение используется CGI для поиска документации и графики. Если в
+#Nagios вы попадаете как http://fasttech.ru/nagios то HTML PATH должен
+#быть /nagios
+url_html_path=/nagios
+# CONTEXT-SENSITIVE HELP
+# Выводить ли контекстную подсказку или нет
+show_context_help=0
+# NAGIOS PROCESS CHECK COMMAND
+# Полный путь и имя программы используемой для проверки самого процесса
+#Nagios. Хотя если Nagios упадет вы сразу это заметите :)
+#nagios_check_command=/usr/lib/nagios/plugins/check_nagios
+#/var/log/nagios/status.dat 5 ‘/usr/sbin/nagios’
+# AUTHENTICATION USAGE
+# Использовать ли аутентификацию для доступа в интерфейс. Однозначно
+#рекомендуется ее использовать!
+use_authentication=1
+# DEFAULT USER
+
+# Пользователи которые могут просматривать статистику без аутентификации
+# лучше избегать всех неконтролируемых событий в жизни серверов
+#default_user_name=guest
+# SYSTEM/PROCESS INFORMATION ACCESS
+# Каким пользователям разрешено получать статистику по этим параметрам
+authorized_for_system_information=nagiosadmin
+# CONFIGURATION INFORMATION ACCESS
+# Каким пользователям разрешено получать статистику по этим параметрам
+authorized_for_configuration_information=nagiosadmin
+# SYSTEM/PROCESS COMMAND ACCESS
+# Каким пользователям разрешено выполнять команды в интерфейсе Nagios
+authorized_for_system_commands=nagiosadmin
+# GLOBAL HOST/SERVICE VIEW ACCESS
+# Каким пользователям разрешено получать статистику по этим параметрам
+authorized_for_all_services=nagiosadmin
+authorized_for_all_hosts=nagiosadmin
+# GLOBAL HOST/SERVICE COMMAND ACCESS
+# Каким пользователям разрешено получать статистику по этим параметрам
+authorized_for_all_service_commands=nagiosadmin
+authorized_for_all_host_commands=nagiosadmin
+# STATUSMAP BACKGROUND IMAGE
+# Опция позволяет задать изображения в качестве бекграунда для Status Map
+#Предполагается что изображение находится в images path (
+#/usr/share/nagios/html/images/). Поддерживаются следующие форматы
+#изображения - GIF, PNG, JPEG, или GD2 format.
+#statusmap_background_image=smbackground.gd2
+# DEFAULT STATUSMAP LAYOUT METHOD
+# Опция задает формат отображения Status Map. Возможные значения:
+# 0 = User-defined coordinates
+# 1 = Depth layers
+# 2 = Collapsed tree
+# 3 = Balanced tree
+# 4 = Circular
+# 5 = Circular (Marked Up)
+
+# Попробуйте разные и решите что вам больше нравится
+default_statusmap_layout=5
+# DEFAULT STATUSWRL LAYOUT METHOD
+# Формат отображения STATUSWRL.
+# Возможные значения:
+# 0 = User-defined coordinates
+# 2 = Collapsed tree
+# 3 = Balanced tree
+# 4 = Circular
+# Для просмотра 3-D Status Map необходим браузер с поддержкой VRML.
+#Информацию о них можно найти в google. Сама по себе технология используется редко.
+default_statuswrl_layout=4
+# STATUSWRL INCLUDE
+# Опция позволяет подключать собственные объекты в генерируемый VRML
+#world. Предполагается что файл расположен в HTML PATH
+#(/usr/share/nagios/html/).
+#statuswrl_include=myworld.wrl
+# PING SYNTAX
+# С какими параметрами нужно пинговать удаленный хост из WAP
+#интерфейса (используя statuswml cgi). В переменную $HOSTADDRESS$
+#будет помещен адрес хоста.
+ping_syntax=/bin/ping -n -U -c 5 $HOSTADDRESS$
+# REFRESH RATE
+# Интервал обновления страниц в секундах различных CGI-страниц (status,
+#statusmap, extinfo, and outages)
+refresh_rate=90
+# SOUND OPTIONS
+# Здесь можно задать звуковые файлы которые будут проигрываться если в
+#сети что-то происходит. Компьютеры операторов Nagios должны быть
+#оборудованы акустикой. Звуковые файлы я бы заменил, больно они
+#неприятные на слух. Файлы расположены в /usr/share/nagios/html/media/
+#host_unreachable_sound=hostdown.wav
+#host_down_sound=hostdown.wav
+#service_critical_sound=critical.wav
+#service_warning_sound=warning.wav
+#service_unknown_sound=warning.wav
+#normal_sound=noproblem.wav
+-----------------------------------------------------------------------------
+Конфигурационный файл /etc/nagios/commands.cfg
+-----------------------------------------------------------------------------
+# Sample command definitions for Nagios 2.12
+# Синтаксис:
+#
+# define command{
+# template <templatename>
+# name <objectname>
+# command_name <commandname>
+# command_line <commandline>
+# }
+#
+# Где:
+#
+# <templatename> = Имя с описанием другой команды которая будет шаблоном
+# для текущей (опционально)
+# <objectname> = Объектное имя с описанием другой команды которая будет
+#шаблоном для текущей (опционально)
+# <commandname> = имя команды которое будет использоваться в Nagios
+# <commandline> = путь к выполняемой команде и аргументы
+# Пример рабочей команды
+define command{
+command_name check_http
+command_line $USER1$/check_http -H $HOSTADDRESS$
+}
+-----------------------------------------------------------------------------
+Конфигурационный файл /etc/nagios/localhost.cfg
+-----------------------------------------------------------------------------
+# LOCALHOST.CFG - SAMPLE OBJECT CONFIG FILE FOR MONITORING #THIS
+MACHINE
+#
+# Для удобства администрирования файл разбит на несколько частей а именно:
+# TIME PERIODS
+# COMMANDS
+# CONTACTS
+# CONTACT GROUPS
+# HOSTS
+# HOST GROUPS
+# SERVICES
+#
+#
+# TIME PERIODS
+# В начале файла описаны различные временные периоды – 24x7, workhours,
+#nonworkhours. В дальнейшем вы их будете использовать для того чтобы
+#сообщить Nagios, в какие часы отсылать уведомления если хост или сервис на
+#нем стали недоступны. Отредактируйте их под свои нужды и политику
+#мониторинга/уведомлений вашей компании.
+define timeperiod{
+timeperiod_name 24x7
+alias 24 Hours A Day, 7 Days A Week
+sunday 00:00-24:00
+monday 00:00-24:00
+tuesday 00:00-24:00
+wednesday 00:00-24:00
+thursday 00:00-24:00
+friday 00:00-24:00
+saturday 00:00-24:00
+}
+# ‘workhours’ timeperiod definition
+define timeperiod{
+timeperiod_name workhours
+alias “Normal” Working Hours
+monday 09:00-17:00
+tuesday 09:00-17:00
+wednesday 09:00-17:00
+thursday 09:00-17:00
+friday 09:00-17:00
+}
+# ‘nonworkhours’ timeperiod definition
+define timeperiod{
+timeperiod_name nonworkhours
+alias Non-Work Hours
+sunday 00:00-24:00
+monday 00:00-09:00,17:00-24:00
+tuesday 00:00-09:00,17:00-24:00
+wednesday 00:00-09:00,17:00-24:00
+thursday 00:00-09:00,17:00-24:00
+friday 00:00-09:00,17:00-24:00
+saturday 00:00-24:00
+}
+# ‘none’ timeperiod definition
+define timeperiod{
+timeperiod_name none
+alias No Time Is A Good Time
+}
+
+# COMMANDS
+# Секция COMMANDS будет пустой потому что, все что нужно уже описано в
+# файле commands.cfg
+# CONTACTS
+# В этой секции мы указываем свои контакты. Куда отсылать уведомления о
+# проблемах с сервисами.
+define contact{
+contact_name nagios-admin
+alias Nagios Admin
+service_notification_period 24x7
+host_notification_period 24x7
+service_notification_options w,u,c,r
+host_notification_options d,r
+service_notification_commands notify-by-email
+host_notification_commands host-notify-by-email
+email nagios-admin@fasttech.ru
+}
+# CONTACT GROUPS
+# При отправке уведомления в контактную группу, все ее участники получат
+# сообщение. Можно удобно распределять администраторов по проектам.
+define contactgroup{
+contactgroup_name admins
+alias Nagios Administrators
+members nagios-admin
+}
+# HOSTS
+# Базовый хост шаблон. В конце его описания стоит register = 0, что означает
+#не использовать его в Nagios
+define host{
+name generic-host ; название host шаблона
+notifications_enabled 1 ; Включать уведомления ?
+event_handler_enabled 1 ; Включать ли event_handler, который
+; отлавливает происходящие события
+flap_detection_enabled 1 ; Включать ли Flap detection ?
+; Flap Detection наступает в случае частой
+; смены состояния хоста
+failure_prediction_enabled 1 ; используется в распределенном
+; мониторинге
+
+process_perf_data 1 ; Обрабатывать информацию о произ-
+; водительности
+retain_status_information 1 ; Сохранять статусную информацию в
+; момент перезагрузки Nagios или нет.
+; Опция работает только если задана другая
+; опция – retain_state_information=1
+retain_nonstatus_information 1 ; Сохранять ли не статусную информацию
+; в момент перезагрузки Nagios
+; нужна опция retain_state_information=1
+notification_period 24x7 ; Период уведомлений по хостам
+register 0 ; Не регистрировать активность этого блока
+; команд, это всего лишь шаблон для
+; других хостов, чтобы не нужно было
+; описывать весь этот список команд 100
+; раз :) примеры использования будут ниже
+}
+# Linux шаблон, будем использовать его для всех наших Linux-серверов
+define host{
+name linux-server ; название шаблона
+use generic-host ; шаблон наследует параметры generic-
+; host который мы описали выше
+check_period 24x7 ; период проверки
+max_check_attempts 10 ; пытаться получить информацию о
+; сервере не более 10 раз
+check_command check-host-alive ; команда по умолчанию для
+; проверки статуса Linux-сервера
+notification_period workhours ; по Linux-серверам нас будут
+; уведомлять только в рабочее
+; время. Поскольку этот шаблон
+; наследует все опции от generic-
+;host а родительские опции пере-
+;крывают собственные, то
+;notification_period будет
+; использован из generic-host,
+;То есть 24x7! Имейте это ввиду.
+notification_interval 120 ; отсылать уведомления заново
+; каждые 2 часа
+
+notification_options d,u,r ; отслылать уведомления только по
+; конкретным статусам хоста
+; d – down state (сервер упал), u -
+; UNREACHABLE state (не удается
+; выяснить состояние сервера так как
+; он не достижим), r – recovery state
+; (восстановление после падения)
+contact_groups admins ; кому отсылать уведомления
+register 0 ; не регистрировать в Nagios, это
+; только шаблон
+}
+# А теперь рабочий пример
+define host{
+use linux-server ; название шаблона в качестве базовых
+; опций для хоста. Шаблон linux-server, в
+; свою очередь унаследовал все опции
+; generic-host
+host_name localhost
+alias localhost
+address 127.0.0.1
+}
+# HOST GROUPS
+# Группы хостов объединеных по каким либо признакам, например Linux-
+#сервера, Windows-сервера, сервера по проектам
+define hostgroup{
+hostgroup_name test
+alias Test Servers
+members localhost
+}
+# SERVICES
+# Базовый шаблон сервиса
+define service{
+name generic-service ; название шаблона
+active_checks_enabled 1 ; включение активной проверки
+passive_checks_enabled 1 ; включение пассивной проверки
+parallelize_check 1 ; проверка сервисов в
+; параллельном режиме
+
+; (отключение может повлечь за
+; собой сильное понижение
+; производительности)
+obsess_over_service 1 ; разрешать ли ocsp_command
+; для сервисов, что повлечет за
+; собой запуск другой команды.
+; Используется в распределенном
+; мониторинге
+check_freshness 0 ; по умолчанию не проверяем
+; “свежесть сервиса”. Это полезно
+; при пассивных проверках
+; сервисов, если мы хотим
+; выяснить, так ли часто
+; пассивный хост доставляет нам
+; информацию о себе как мы хотим
+notifications_enabled 1 ; уведомление о сервисах включено
+event_handler_enabled 1 ; event handler сервисов включен
+flap_detection_enabled 1 ; Flap detection (частая смена
+; статуса сервиса) включен
+failure_prediction_enabled 1 ; используется в распределенном
+; мониторинге
+process_perf_data 1 ; Обрабатывать информацию о
+; производительности
+retain_status_information 1 ; Сохранять статусную информацию в
+; момент перезагрузки Nagios или нет.
+; Опция работает только если задана другая
+; опция – retain_state_information=1
+retain_nonstatus_information 1 ; Сохранять ли не статусную информацию
+; в момент перезагрузки Nagios ?
+; нужна опция retain_state_information=1
+is_volatile 0 ; изменчивый ли сервис по своей природе ?
+register 0 ; не регистрировать активность, это
+;всего лишь шаблон для других сервисов
+}
+# По аналогии с linux-server этот шаблон уже “боевой”, его мы будем
+#использовать для конкретных хостов
+
+define service{
+name local-service ; название шаблона
+use generic-service ; наследуем значения generic-
+; service
+check_period 24x7 ; период проверки
+max_check_attempts 4 ; запрашивать статус сервиса до 4
+; раз
+normal_check_interval 5 ; в нормальном состояние
+; сервис проверять каждые 5
+; минут
+retry_check_interval 1 ; перепроверка сервиса каждую
+; минуты
+contact_groups admins ; контактная группа
+notification_options w,u,c,r ; уведомления отправлять
+; только в случае w – Warning
+; state, u – Unknown state, c –
+; Critical state и r – Recovery state
+; (события наступающее в
+; момент восстановления
+; работоспособности сервиса)
+notification_interval 60 ; отправлять заново уведомление
+; о проблеме с сервисами каждый час
+notification_period 24x7 ; период уведомления,
+; круглосуточно
+register 0 ; этот блок команд - шаблон
+}
+# в конце описаны сервисы для мониторинга
+# пингуем локальную машину, занятие конечно бесполезное но здесь это в
+# качестве примера
+define service{
+use local-service ; используемый шаблон
+host_name localhost
+service_description PING
+check_command check_ping!100.0,20%!500.0,60%
+}
+# проверяем свободное место в корне (/) локальной машины, если свободно
+#менее 20% то сервис устанавливаем в Warning state, если менее 10% то
+#Critical state
+define service{
+use local-service ; используемый шаблон
+host_name localhost ; какой хост проверяем
+service_description Root Partition ; название сервиса в Nagios
+check_command check_local_disk!20%!10%!/ ; команда
+}
+# мониторинг подключенных пользователей в локальной системе, если
+#подключено более 20 то сервис переходит в режим Warning state, если более
+#50 то Critical state
+define service{
+use local-service ; используемый шаблон
+host_name localhost ; какой хост проверяем
+service_description Current Users ; название сервиса в Nagios
+check_command check_local_users!20!50 ; команда
+}
+# мониторинг локальных процессов, если запущено более 250 то наступает
+#Warning state, если более 400 наступает Critical state
+define service{
+use local-service ; используемый шаблон
+host_name localhost ; какой хост проверяем
+service_description Total Processes ; название сервиса в Nagios
+check_command check_local_procs!250!400!RSZDT ; команда
+}
+# проверяем нагрузку на локальной машине
+define service{
+use local-service ; используемый шаблон
+host_name localhost ; какой хост проверяем
+service_description Current Load ; название сервиса в Nagios
+check_command check_local_load!5.0,4.0,3.0!10.0,6.0,4.0 ; команда
+}
+
+-----------------------------------------------------------------------------
+Конфигурационный файл /etc/nagios/nagios.cfg
+-----------------------------------------------------------------------------
+# NAGIOS.CFG - Sample Main Config File for Nagios 2.12
+# LOG FILE
+# Log-файл куда пишутся все события хостов и сервисов
+# NAGIOS.CFG - Sample Main Config File for Nagios 2.12
+# LOG FILE
+# Log-файл куда пишутся все события хостов и сервисов
+# эта опция должна быть первой в конфигурационном файле!
+log_file=/var/log/nagios/nagios.log
+# OBJECT CONFIGURATION FILE(S)
+# Объектные файлы — это файлы в которых описываются хосты, хост группы,
+#контакты, группы контактов, сервисы и т.д.
+# все эти секции могут быть описаны в разных файлах, для этого нужно
+#использовать директиву cfg_file
+# Команды описаны в этом файле
+cfg_file=/etc/nagios/commands.cfg
+# localhost и его сервисы описаны в этом файле
+cfg_file=/etc/nagios/localhost.cfg
+# Ниже представлен пример разделения секций по разным файлам
+#cfg_file=/etc/nagios/contactgroups.cfg
+#cfg_file=/etc/nagios/contacts.cfg
+#cfg_file=/etc/nagios/dependencies.cfg
+#cfg_file=/etc/nagios/escalations.cfg
+#cfg_file=/etc/nagios/hostgroups.cfg
+#cfg_file=/etc/nagios/hosts.cfg
+#cfg_file=/etc/nagios/services.cfg
+#cfg_file=/etc/nagios/timeperiods.cfg
+# Nagios умеет обрабатывать все файлы с расширением .cfg в каком либо
+#каталоге, для этого используется директива cfg_dir
+#cfg_dir=/etc/nagios/servers
+#cfg_dir=/etc/nagios/printers
+#cfg_dir=/etc/nagios/switches
+#cfg_dir=/etc/nagios/routers
+# OBJECT CACHE FILE
+# Cache-файл Nagios. CGI — программы получают конфигурацию из него а не
+#напрямую из объектных файлов. Это защищает от несогласованности
+#конфигурации в случае, если она изменялась после старта Nagios.
+object_cache_file=/var/log/nagios/objects.cache
+# RESOURCE FILE
+# Файл содержащий $USERx$ макросы
+# CGI-программы будут использовать указанный вами макрос но они не будут
+#знать что внутри этого макроса. Макросы стоит использовать при указание в
+#команде логинов/паролей и другой конфиденциальной информации.
+# на файл /etc/nagios/private/resource.cfg установлены права 640
+resource_file=/etc/nagios/private/resource.cfg
+# STATUS FILE
+# Файл в котором сохранен текущий статус всех сервисов и хостов, он
+#очищается при перезагрузке Nagios
+status_file=/var/log/nagios/status.dat
+# NAGIOS USER
+# От какого пользователя запускать процесс Nagios в операционной системе
+nagios_user=nagios
+# NAGIOS GROUP
+# Рабочая группа Nagios
+nagios_group=nagios
+# EXTERNAL COMMAND OPTION
+# Включать ли внешние команды. Если включим то появится возможность
+#управлять хостами и сервисами через веб-интерфейс (включать/отключать
+#уведомления для них, включать/выключать пассивные проверки и т.д.).
+check_external_commands=0
+# EXTERNAL COMMAND CHECK INTERVAL
+# Интервал, через который Nagios будет проверять наличие команд для себя.
+#Команды через веб-интерфейс выполняются не сразу а через определенный
+#интервал. Этот интервал мы и указываем.
+# Можно указать значение в секундах, например 15s а можно указать -1 что
+#означает проверять наличие команд так часто, как только возможно
+#command_check_interval=15s
+command_check_interval=-1
+# EXTERNAL COMMAND FILE
+# Файл в который будут записываться команды в очередь на выполнение. Он
+#должен иметь права на запись для пользователя от которого выполняется
+#процесс веб-сервера
+command_file=/var/spool/nagios/cmd/nagios.cmd
+
+# EXTERNAL COMMAND BUFFER SLOTS
+# Количество слотов для внешних команд. Значения по умолчанию более чем
+#достаточно
+external_command_buffer_slots=4096
+# COMMENT FILE
+# Файл в котором сохраняются комментарии для хостов и сервисов
+comment_file=/var/log/nagios/comments.dat
+# DOWNTIME FILE
+# Файл в котором сохраняется информация о downtime-времени хостов и
+#сервисов, То есть времени когда они не доступны
+downtime_file=/var/log/nagios/downtime.dat
+# LOCK FILE
+# В этом файле хранится PID процесса Nagios. Используется сторонними
+#программами
+lock_file=/var/run/nagios.pid
+# TEMP FILE
+# Временный файл используется при обновление статус-лога, очистки
+#комментариев и т.д.
+temp_file=/var/log/nagios/nagios.tmp
+# EVENT BROKER OPTIONS
+# Благодря модулям, брокер может обслуживать различные происходящие
+#события в Nagios
+# Values: 0 = Broker nothing
+# -1 = Broker everything
+# <other> = See documentation
+event_broker_options=-1
+# EVENT BROKER MODULE(S)
+# Здесь подгружаются модули брокера
+# Example:
+#
+# broker_module=<modulepath> [moduleargs]
+#broker_module=/somewhere/module1.o
+#broker_module=/somewhere/module2.o arg1 arg2=3 debug=0
+
+# LOG ROTATION METHOD
+# Способы ротации главного лога Nagios
+# n = None - don’t rotate the log
+# h = Hourly rotation (top of the hour)
+# d = Daily rotation (midnight every day)
+# w = Weekly rotation (midnight on Saturday evening)
+# m = Monthly rotation (midnight last day of month)
+log_rotation_method=d
+# LOG ARCHIVE PATH
+# Расположение архива лог-файлов
+log_archive_path=/var/log/nagios/archives
+# LOGGING OPTIONS
+# Используем системную службу Syslog чтобы записывать логи
+use_syslog=1
+# NOTIFICATION LOGGING OPTION
+# Уведомления тоже записывать в лог
+log_notifications=1
+# SERVICE RETRY LOGGING OPTION
+# Повторные проверки сервисов тоже записывать в лог
+log_service_retries=1
+# HOST RETRY LOGGING OPTION
+# Повторные проверки хостов тоже записывать в лог
+log_host_retries=1
+# EVENT HANDLER LOGGING OPTION
+# Записываем в логи event handlers, event handlers — это опциональные программы
+# которые могут быть выполнены когда состояние хоста или сервиса изменяется
+log_event_handlers=1
+# INITIAL STATES LOGGING OPTION
+# Записывать ли initial state в лог-файл ? Initial state — это когда хост или сервис
+# проверяется в первый раз, включить — 1, выключить — 0
+log_initial_states=0
+
+# EXTERNAL COMMANDS LOGGING OPTION
+# Записывать ли в лог активность внешних команд ?
+# Опция не включает логирование пассивных проверок, для этого есть опция о
+# которой ниже
+log_external_commands=1
+# PASSIVE CHECKS LOGGING OPTION
+# Логирование пассивных проверок хостов и сервисов
+log_passive_checks=1
+# GLOBAL HOST AND SERVICE EVENT HANDLERS
+# Опции позволяют указать команды event handler`а для хоста или сервиса,
+# которые будут выполняться в случае изменения их состояния. global event
+# handler выполняется немедленно, предшествуя event handler`у указанному в
+# секции хоста или сервиса.
+#global_host_event_handler=somecommand
+#global_service_event_handler=somecommand
+# SERVICE INTER-CHECK DELAY METHOD
+# Метод распределения нагрузки в момент старта мониторинга. Чтобы снизить
+# нагрузку на сервер мониторинга, все запросы к сервисам отсылаются не в
+# один момент времени а с определенным интервалом.
+# n = None - don’t use any delay between checks
+# d = Use a “dumb” delay of 1 second between checks
+# s = Use “smart” inter-check delay calculation
+# x.xx = Use an inter-check delay of x.xx seconds
+service_inter_check_delay_method=s
+# MAXIMUM SERVICE CHECK SPREAD
+# Временной фрейм в течение которого все первичные проверки сервисов
+# должны быть завершены. По умолчанию 30 минут.
+max_service_check_spread=30
+# SERVICE CHECK INTERLEAVE FACTOR
+# Это значение определяет метод чередования проверок хостов и сервисов,
+# который позволит снизить нагрузку на удаленную машину
+# s = Use “smart” interleave factor calculation
+# x = Use an interleave factor of x, where x is a
+# number greater than or equal to 1.
+service_interleave_factor=s
+
+# HOST INTER-CHECK DELAY METHOD
+# Метод распределения нагрузки в момент старта мониторинга. Чтобы снизить
+# нагрузку на сервер мониторинга, все запросы к хостам отсылаются не в один
+# момент времени а с определенным интервалом.
+# n = None - don’t use any delay between checks
+# d = Use a “dumb” delay of 1 second between checks
+# s = Use “smart” inter-check delay calculation
+# x.xx = Use an inter-check delay of x.xx seconds
+host_inter_check_delay_method=s
+# MAXIMUM HOST CHECK SPREAD
+# Временной фрейм в течение которого все первичные проверки сервисов
+# должны быть завершены. По умолчанию 30 минут.
+max_host_check_spread=30
+# MAXIMUM CONCURRENT SERVICE CHECKS
+# Опция позволяет задать максимальное число сервисов, проверяемых
+# параллельно в определенный момент времени. 1 — запрещает проверку
+# сервисов в параллельном режиме, 0 — не ограничивает число одновременных
+# проверок
+max_concurrent_checks=0
+# SERVICE CHECK REAPER FREQUENCY
+# Частота с которой Nagios обрабатывает результаты проверки сервисов.
+# Указывается в секундах.
+service_reaper_frequency=10
+# CHECK RESULT BUFFER SLOTS
+# Задает число слотов для хранения результатов проверки сервисов, после
+# обработки результата слот освобождается. Значения по умолчанию более чем
+# достаточно.
+check_result_buffer_slots=4096
+# AUTO-RESCHEDULING OPTION
+# Опция может помочь сбалансировать нагрузку на сервер мониторинга
+# автоматически переназначив проверку хостов и сервисов, распределяя
+# нагрузку во времени. Опция эксперементальная и ее использование на свой
+# страх и риск.
+auto_reschedule_checks=0
+# AUTO-RESCHEDULING INTERVAL
+
+# Интервал переназначения в секундах.
+auto_rescheduling_interval=30
+# AUTO-RESCHEDULING WINDOW
+# Размер «окна» в секундах. Проверки хостов и сервисов назначенные в
+# следующие X секунд (размер окна) будут переназначены.
+auto_rescheduling_window=180
+# SLEEP TIME
+# Время «сна» между которыми проверяются системные события и проверки
+# сервисов которые должны быть выполнены
+sleep_time=0.25
+# TIMEOUT VALUES
+# Как много времени давать на выполнение команде, после истечения которого
+# она будет принудительно завершена. Значение указывается в секундах.
+service_check_timeout=60
+host_check_timeout=30
+event_handler_timeout=30
+notification_timeout=30
+ocsp_timeout=5
+perfdata_timeout=5
+# RETAIN STATE INFORMATION
+# Сохранять ли статусную информацию для хостов и сервисов в случае
+# выключения Nagios. После рестарта Nagios вся сохраненная информация
+# будет обратно загружена.
+retain_state_information=1
+# STATE RETENTION FILE
+# Файл в котором сохраняется информация о статусе хостов и сервисов перед
+# выключение Nagios. Файл используется только если preserve_state_information
+# равен 1
+state_retention_file=/var/log/nagios/retention.dat
+# RETENTION DATA UPDATE INTERVAL
+# Как часто сохранять в файл информацию о статусе хостов и сервисов пока
+# Nagios нормально работает. Указывается в минутах.
+retention_update_interval=60
+
+# USE RETAINED PROGRAM STATE
+# Восстанавливать ли статус для хостов и сервисов из retention file. 1 —
+# восстанавливать, 0 - нет
+use_retained_program_state=1
+# USE RETAINED SCHEDULING INFO
+# Восстанавливать ли информацию о запланированной следующей проверке из
+# retention file или нет.
+use_retained_scheduling_info=0
+# INTERVAL LENGTH
+# Интервал проверки
+interval_length=60
+# AGGRESSIVE HOST CHECKING OPTION
+# Включать ли агресивную проверку хостов. Это может занять больше времени
+# чем обычная. 1 — включить, 0 - выключить
+use_aggressive_host_checking=0
+# SERVICE CHECK EXECUTION OPTION
+# Выполнять ли активно проверки сервисов когда они стартуют первый раз
+# 1 — включать активные проверки, 0 — не включать
+execute_service_checks=1
+# PASSIVE SERVICE CHECK ACCEPTANCE OPTION
+# Принимать ли результаты пассивных проверок когда сервисы только
+# стартуют или рестартуют
+# 1 — принимать пассивные проверки, 0 — не принимать
+accept_passive_service_checks=1
+# HOST CHECK EXECUTION OPTION
+# Выполнять ли активно проверки хостов когда они стартуют первый раз
+# 1 — включать активные проверки, 0 — не включать
+execute_host_checks=1
+# PASSIVE HOST CHECK ACCEPTANCE OPTION
+# Принимать ли результаты пассивных проверок когда хосты только стартуют
+# или рестартуют
+accept_passive_host_checks=1
+# NOTIFICATIONS OPTION
+# Уведомлять когда хост или сервис стартуют первый раз ?
+# 1 — да, 0 — нет
+enable_notifications=1
+# EVENT HANDLER USE OPTION
+# Запускать ли event handler для только что запущенного хоста или сервиса
+# 1 — запускать, 0 — не запускать
+enable_event_handlers=1
+# PROCESS PERFORMANCE DATA OPTION
+# Обрабатывать ли информацию о производительности полученную от хостов и
+# сервисов. Информация может содержать в себе задержку в проверке (разницу
+# с запланированной проверкой), сколько проверка заняла времени и т.д.
+# Проверка производительности осуществляется командами
+# host_perfdata_command (о ней ниже) и service_perfdata_command (о ней ниже).
+# 1 — обрабатывать данные о производительности, 0 — не обрабатывать
+process_performance_data=0
+# HOST AND SERVICE PERFORMANCE DATA PROCESSING COMMANDS
+# Команды запускаются после того, как проверка хостов и сервисов
+# завершится. Команды выполняются только если enable_performance_data
+# равняется 1. Командный аргумент — короткое имя команды которое указано в
+# host configuration file
+#host_perfdata_command=process-host-perfdata
+#service_perfdata_command=process-service-perfdata
+# HOST AND SERVICE PERFORMANCE DATA FILES
+# Файлы в которые сохраняется информация о производительности хостов и
+# сервисов. Должна быть включена опция enable_performance_data
+#host_perfdata_file=/tmp/host-perfdata
+#service_perfdata_file=/tmp/service-perfdata
+# HOST AND SERVICE PERFORMANCE DATA FILE TEMPLATES
+# Шаблон для файлов содержащих информацию о производительности. Здесь
+# описаны правила по которым нужно писать информацию в файлы. Шаблоны
+# могут содержать макросы, специальные символы (\t — табуляция, \r —
+# перевод каретки, \n — новая строка) и обычный текст. Новая строка
+# автоматически добавляется после каждой записи в файл. Пара примеров дана
+# ниже.
+#host_perfdata_file_template=[HOSTPERFDATA]\t$TIMET$\t$HOSTNAME$\t
+#$HOSTEXECUTIONTIME$\t$HOSTOUTPUT$\t$HOSTPERFDATA$
+#service_perfdata_file_template=[SERVICEPERFDATA]\t$TIMET$\t
+#$HOSTNAME$\t$SERVICEDESC$\t$SERVICEEXECUTIONTIME$\t
+
+#$SERVICELATENCY$\t$SERVICEOUTPUT$\t$SERVICEPERFDATA$
+# HOST AND SERVICE PERFORMANCE DATA FILE MODES
+# Режим работы с файлами
+# a — append (дописывать в файл), w — write (записывать). Режим по
+# умолчанию вполне всем хорош.
+#host_perfdata_file_mode=a
+#service_perfdata_file_mode=a
+# HOST AND SERVICE PERFORMANCE DATA FILE PROCESSING #INTERVAL
+# Как часто обрабатывать performance files командами которых указаны ниже.
+# Значение указывается в секундах. 0 означает что обрабатывать не нужно.
+#host_perfdata_file_processing_interval=0
+#service_perfdata_file_processing_interval=0
+# HOST AND SERVICE PERFORMANCE DATA FILE PROCESSING #COMMANDS
+# Используемые команды для обработки performance data files
+#host_perfdata_file_processing_command=process-host-perfdata-file
+#service_perfdata_file_processing_command=process-service-perfdata-file
+# OBSESS OVER SERVICE CHECKS OPTION
+# Если не планируется система распределенного мониторинга то опцию лучше
+# не включать
+obsess_over_services=0
+# OBSESSIVE COMPULSIVE SERVICE PROCESSOR COMMAND
+# Команда запускаемая для каждого сервиса. Работает только если
+# obsess_over_services равняется 1
+#ocsp_command=somecommand
+# ORPHANED SERVICE CHECK OPTION
+# Опция призвана решать редкую проблему, когда сервис не может быть
+# перезапущен.
+check_for_orphaned_services=1
+# SERVICE FRESHNESS CHECK OPTION
+# Проверять ли «свежесть» сервисов, это полезно при пассивных проверках
+
+# когда нужно убедится что информация о сервисах поступает с нормальной
+# переодичностью.
+# 1 — включить проверку, 0 — отключить
+check_service_freshness=1
+# SERVICE FRESHNESS CHECK INTERVAL
+# Интервал проверки «свежести» сервисов в секундах.
+service_freshness_check_interval=60
+# HOST FRESHNESS CHECK OPTION
+# Проверять ли «свежесть» хостов, это полезно при пассивных проверках
+# когда нужно убедится что информация о хостах поступает с нормальной
+# переодичностью.
+# 1 — включить проверку, 0 — отключить
+check_host_freshness=0
+# HOST FRESHNESS CHECK INTERVAL
+# Интервал проверки «свежести» хостов в секундах.
+host_freshness_check_interval=60
+# AGGREGATED STATUS UPDATES
+# Объединять обновления хостов, сервисов и данные состояния программ или
+# нет. Обычно результаты обновляются моментально, что может создать
+# большую нагрузку на сервер мониторинга.
+# 1 — включить объединение результатов, 0 — не включать
+aggregate_status_updates=1
+# AGGREGATED STATUS UPDATE INTERVAL
+# Интервал в секундах объединенного обновления статуса хостов и сервисов
+status_update_interval=15
+# FLAP DETECTION OPTION
+# Влючать или нет обнаружение частой смены состояния хоста или сервиса.
+# 1 — включить, 0 — выключить
+enable_flap_detection=0
+# FLAP DETECTION THRESHOLDS FOR HOSTS AND SERVICES
+# Пороговые значения для flapping`а
+# Подробнее про это написано здесь - #http://nagios.sourceforge.net/docs/2_0/flapping.html
+
+low_service_flap_threshold=5.0
+high_service_flap_threshold=20.0
+low_host_flap_threshold=5.0
+high_host_flap_threshold=20.0
+# DATE FORMAT OPTION
+# Формам отображения даты
+# us (MM-DD-YYYY HH:MM:SS)
+# euro (DD-MM-YYYY HH:MM:SS)
+# iso8601 (YYYY-MM-DD HH:MM:SS)
+# strict-iso8601 (YYYY-MM-DDTHH:MM:SS)
+date_format=euro
+# P1.PL FILE LOCATION
+# Путь к скрипту p1.pl который используется встроенными Perl интерпретатором
+p1_file=/usr/sbin/p1.pl
+# ILLEGAL OBJECT NAME CHARACTERS
+# Здесь можно указать символы которые не могут быть использованы в
+# название хостов, описание сервисов или в название других типах объектов
+illegal_object_name_chars=`~!$%^&*|’”<>?,()=
+# ILLEGAL MACRO OUTPUT CHARACTERS
+# Здесь можно указать символы которые будут убраны из макросов до того как
+# будут использованы в уведомлениях и т.д. Это не распространяется на макросы
+# используемые в командах проверки хостов и сервисов
+illegal_macro_output_chars=`~$&|’”<>
+# REGULAR EXPRESSION MATCHING
+# Использовать регулярные выражения или нет
+# 1 — включить, 0 — выключить
+use_regexp_matching=0
+# “TRUE” REGULAR EXPRESSION MATCHING
+# Опция используется только если use_regexp_matching равняется 1. При
+# отключенной опции совпадение происходит только на основание маски (*
+# и ?), при включенной это происходит всегда, что может раздражать.
+# 0 — отключить, 1 — включить
+use_true_regexp_matching=0
+# ADMINISTRATOR EMAIL ADDRESS
+
+# Почтовый адрес администратора этого сервера
+admin_email=nagios
+# ADMINISTRATOR PAGER NUMBER/ADDRESS
+# Номер пейджера администратора этого сервера. Определенно устаревшая опция.
+admin_pager=pagenagios
+# DAEMON CORE DUMP OPTION
+# Разрешать создавать core dump или нет. Может использоваться для отладки.
+# 1 — разрешать создавать, 0 — не разрешать
+daemon_dumps_core=0
+-----------------------------------------------------------------------------
+Конфигурационный файл /etc/nagios/private/resource.cfg
+-----------------------------------------------------------------------------
+# RESOURCE.CFG - Sample Resource File for Nagios 2.12
+# Этот файл содержит различные макросы, CGI-программы будут обращаться
+# именно к ним а не к этому файлу напрямую. Поэтому здесь можно
+# использовать все возвожные пароли и логины и не бояться утечки информации.
+# Макрос $USER1$ будет содержать путь к плагинам
+$USER1$=/usr/lib/nagios/plugins
+# Макрос $USER2$ будет содержать путь к event handlers
+#$USER2$=/usr/lib/nagios/plugins/eventhandlers
+# Store some usernames and passwords (hidden from the CGIs)
+#$USER3$=someuser
+#$USER4$=somepassword
+-----------------------------------------------------------------------------
+Добавление хостов и сервисов на мониторинг
+-----------------------------------------------------------------------------
+Есть linux-сервер с IP 192.168.146.135 и на нем работает веб-сервер,
+DHCP-сервер и SMTP-сервер.
+Добавим проверку этих трех служб и обычную доступность сервера
+Мне повезло, все нужные мне плагины поставляются с Nagios и их не
+пришлось искать в Интернет
+Добавляем в файл /etc/nagios/localhost.cfg
+-----------------------------------------------------------------------------
+# Чтобы поставить на мониторинг новый сервер необходимо описать секцию
+# host с его участием. Здесь указываем какой шаблон настроек будем
+# использовать, хостнейм который должен резолвится с помощью DNS или
+# быть указанным в /etc/hosts, альяс и IP-адрес сервера
+define host{
+use linux-server
+host_name mylinuxbox
+alias mylinuxbox
+address 192.168.146.135
+}
+# А теперь опишим сервисы которые хотим поставить на мониторинг на этом
+# сервере
+define service{
+use local-service
+host_name mylinuxbox
+service_description PING
+check_command check_ping!100.0,10%!200.0,60%
+}
+define service{
+use local-service
+host_name mylinuxbox
+service_description SMTP
+check_command check_smtp
+}
+define service{
+use local-service
+host_name mylinuxbox
+service_description Apache
+check_command check_http
+}
+define service{
+use local-service
+host_name mylinuxbox
+service_description DHCPD
+check_command check_dhcp
+}
+-----------------------------------------------------------------------------
+Чтобы узнать какие опции можно применить к командам check_* делаем
+следующее
+# /usr/lib/nagios/plugins/check_<название плагина> -h, например
+# /usr/lib/nagios/plugins/check_http -h
+-----------------------------------------------------------------------------
+Плагин check_dhcp есть в /usr/lib/nagios/plugins но не описан в /etc/nagios/
+commands.cfg поэтому внесем соответствующию запись
+-----------------------------------------------------------------------------
+define command{
+command_name check_dhcp
+command_line $USER1$/check_dhcp -s $HOSTADDRESS$
+}
+-----------------------------------------------------------------------------
+Проверить ошибки в конфигурации можно командой
+#/usr/sbin/nagios -v /etc/nagios/nagios.cfg
+-----------------------------------------------------------------------------
+# systemctl restart nagios
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
 Supervisord
 -----------------------------------------------------------------------------
 backup сайта по ssh
@@ -23211,7 +24265,7 @@ http://dig.ua/
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
-
+Мониторинг системы
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
