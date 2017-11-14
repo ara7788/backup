@@ -11125,6 +11125,13 @@ php.ini:memory_limit = 12M
 php -m
 chown -R
 chmod -R 
+
+#Создать если необходимо папку для сессий
+cd /var/lib/php/
+mkdir session
+chown apache:apache session/
+
+echo > "memory_limit = 12M" > /etc/php.ini
 ---------------------------------------------------------------
 tail -f /var/log/httpd/domains/default.domain.error.log
 ---------------------------------------------------------------
@@ -12839,7 +12846,8 @@ ARCHIVEPATH=/usr/app/security/var/data/backups/mysql/
 
 setRead() {
 # change properties on binlog path
-sudo chmod o+rx $BINLOGPATH
+sudo 
+ o+rx $BINLOGPATH
 sudo chmod o+r $BINLOGPATH/*
 }
 
