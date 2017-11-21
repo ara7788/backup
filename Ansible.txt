@@ -1,0 +1,3019 @@
+﻿					#########
+					#Ansible#
+					#########
+-------------------------------------------------------------------------------------
+  1. Configuration
+  2. Installation
+  3. Inventory
+  4. Patterns
+  5. Ad-Hoc Commands
+  6. Command Line Tools
+	6.1 ansible
+	6.2 ansible-playbook
+	6.3 ansible-vault
+	6.4 ansible-galaxy
+	6.5 ansible-console
+	6.6 ansible-config
+	6.7 ansible-doc
+	6.8 ansible-inventory
+	6.9 ansible-pull
+  7. Playbooks
+	7.1 Пример
+	7.2 Работа с результатами выполнения модуля
+	7.3 Ошибка
+	7.4 Правилах написания YAML-файлов
+	7.5 Include
+	7.6 Переменные
+	7.6.1 Приоритет переменных
+	7.7 Условия
+	7.8 Циклы
+	7.9 Роли
+	7.10 Handlers
+	7.11 Фильтры Jinja2
+	7.12 Тесты Jinja2
+  8. Module
+	8.1 command/shell/script/raw/file/copy/cron/template/action
+	8.2 setup/yum/apt/fetch/mail
+	8.3 user/become/sudo/selinux
+	8.4 git/jenkins
+	8.5 ios_facts/ios_command/ios_config/ntc_ansible/set_fact/snmp_fact
+
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/
+-------------------------------------------------------------------------------------
+
+    правильная и быстрая настройка серверов до нужной конфигурации;
+    управление развертыванием облачных серверов (через API, с помощью Docker);
+    установка и обновление приложений;
+    координация звеньев инфраструктуры для выполнения развертываний;
+    централизованный сбор логов.
+
+-------------------------------------------------------------------------------------
+	1. Configuration
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/
+http://docs.ansible.com/ansible/latest/intro_configuration.html
+-------------------------------------------------------------------------------------
+
+    Настройки Ansible можно менять в конфигурационном файле.
+Конфигурационный файл Ansible может храниться в разных местах (файлы
+перечислены в порядке уменьшения приоритета):
+-------------------------------------------------------------------------------------
+	ANSIBLE_CONFIG (переменная окружения)
+	ansible.cfg (в текущем каталоге)	
+	.ansible.cfg (в домашнем каталоге пользователя)
+	/etc/ansible/ansible.cfg
+-------------------------------------------------------------------------------------
+Ansible ищет файл конфигурации в указанном порядке и использует первый
+найденный (конфигурация из разных файлов не совмещается).
+
+    Примечание. Некоторые параметры или даже всю конфигурацию также можно
+переопределить в playbook или переменных окружения.
+-------------------------------------------------------------------------------------
+В текущем каталоге надо создать такой конфигурационный файл ansible.cfg:
+-------------------------------------------------------------------------------------
+ [defaults]
+inventory = ./myhosts		#местоположение инвентарного файла
+remote_user = cisco		#от имени какого пользователя будет подключаться Ansible
+ask_pass = True			#аналогичен опции --ask-pass в командной строке
+# gathering = explicit		#собирает факты об устройствах, модуль setup
+host_key_checking=False		#отвечает за проверку ключей при подключении по SSH
+log_path = /var/log/ansible.log
+module_name 			#имя модуля по умолчанию (-m) для / usr / bin / ansible.
+				#По умолчанию используется модуль «command». Помните, что 
+				#командный модуль не поддерживает переменные оболочки,
+				#трубы или кавычки, поэтому вы можете изменить его на «shell»:
+module_utils = / usr / share / ansible / my_module_utils
+				#module_utils - это модули python, которые Ansible может
+				#комбинировать с Ansible модулями при отправке их на
+				#удаленный компьютер. 
+hosts = *			#default group of hosts to talk to in a playbook if no “hosts:” stanza is supplied
+# private_key_file = /path/to/file.pem
+remote_port = 22		
+remote_tmp = ~ / .ansible / tmp	#передавая модули на ваши удаленные компьютеры, запуская их 					#, а затем очищая после себя.
+
+role_path = / opt / mysite / role : / opt / othersite / role
+
+squash_actions = apk, apt, dnf, homebrew, package, pacman, pkgng, yum, zypper
+				#при использовании with_ looping. Вместо вызова модуля один
+				#раз для каждого элемента модуль вызывается один раз с полным списком.
+sudo_user = root
+timeout = 10			#тайм-аут SSH
+-------------------------------------------------------------------------------------
+Настройки эскалации привилегий
+-------------------------------------------------------------------------------------
+ [privilege_escalation]
+become = True			#Эквивалент добавления sudo: или su: для игры или
+				#задачи, установите для true / yes для активации повышения привилегий.
+become_method = su		#Установите способ эскалации привилегий. По умолчанию
+				#используется sudo , другие параметры: su , pbrun , doas , ksu , ksu :
+become_user = root		#Эквивалент ansible_sudo_user или ansible_su_user
+become_ask_pass = True		#Запросите пароль для повышения привилегий
+become_allow_same_user = True	#
+-------------------------------------------------------------------------------------
+ [paramiko_connection]
+-------------------------------------------------------------------------------------
+Paramiko - это стандартная реализация соединения SSH на Enterprise Linux 6 или более
+ранней версии и по умолчанию не используется на других платформах.
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/intro_configuration.html#paramiko-specific-settings
+-------------------------------------------------------------------------------------
+ [ssh_connection]
+-------------------------------------------------------------------------------------
+ssh_args = -o ControlMaster = auto -o ControlPersist = 60s	# передаст определенный набор параметров для Ansible
+control_path = % ( каталог ) s / ansible-ssh - %% h - %% p - %% r	#место для сохранения сокетов ControlPath
+control_path_dir = ~ / .ansible / cp	#базовый каталог сокетов ControlPath.
+					#Это часть %(directory)s параметра control_path
+retries = 0			#Добавляет возможность повторить неудачные попытки ssh,
+				#если сбой встречается в самом ssh, а не в удаленной команде.
+scp_if_ssh = False
+pipelining = False		#Включение конвейерной обработки уменьшает количество операций SSH
+ssh_executable = "/ usr / local / bin / ssh"
+-------------------------------------------------------------------------------------
+ [accelerate]
+-------------------------------------------------------------------------------------
+Ускорение является полезной функцией производительности для использования , если вы
+не можете включить конвейерные в вашей среде, но, вероятно , если вы можете не нужно.
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/intro_configuration.html#accelerated-mode-settings
+-------------------------------------------------------------------------------------
+ [selinux]
+-------------------------------------------------------------------------------------
+Эти параметры, которые управляют SELinux взаимодействия. 
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/intro_configuration.html#selinux-specific-settings
+-------------------------------------------------------------------------------------
+ special_context_filesystems  = NFS, vboxsf, предохранитель, RAMFS, myspecialfs
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	Пример ansible.cfg:
+-------------------------------------------------------------------------------------
+https://raw.githubusercontent.com/ansible/ansible/devel/examples/ansible.cfg
+-------------------------------------------------------------------------------------
+	2. Installation
+-------------------------------------------------------------------------------------
+http://docs.ansible.com/ansible/latest/intro_installation.html
+-------------------------------------------------------------------------------------
+$ sudo apt-get update
+$ sudo apt-get install software-properties-common
+$ sudo apt-add-repository ppa:ansible/ansible
+$ sudo apt-get update
+$ sudo apt-get install ansible
+-------------------------------------------------------------------------------------
+deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main
+$ sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
+$ sudo apt-get update
+$ sudo apt-get install ansible
+-------------------------------------------------------------------------------------
+sudo rpm -iUvh http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-5.noarch.rpm
+sudo yum -y update
+sudo yum -y install ansible
+ansible --version
+-------------------------------------------------------------------------------------
+# yum install epel-release
+# yum install ansible
+$ ansible --version
+-------------------------------------------------------------------------------------
+Как я говорил ранее, ansible использует подключение SSH по ключу (для доступа к
+настраиваемым серверам), по этому, нужно сгенерировать его:
+-------------------------------------------------------------------------------------
+$ ssh-keygen
+
+Или более расширенный вариант:
+	
+# ssh-keygen -t rsa -b 4096 -C "admin@linux-notes.org"
+-------------------------------------------------------------------------------------
+Заблокирую доступ к SSH каталогу, что только вы cмогли читать или писать в данную папку:
+	
+# chmod 700 ~/.ssh
+
+Нужно изменить разрешения, чтобы сохранить этоти файлы в безопасности:
+	
+# chmod 600 ~/.ssh/id_rsa && chmod 644 ~/.ssh/id_rsa.pub
+
+Создаем простой ключ, все пропускаем (нажимаем enter на все вопросы). После того как ключ сгенерировали, нужно его передать на все имеющийся ноды, для этого есть команда:
+	
+$ ssh-copy-id root@ip_адрес_настраиваемого_сервера
+
+У меня это:
+	
+$ ssh-copy-id captain@192.168.1.216
+
+PS: И так для каждой управляемой ноды!
+
+Выставим правильные права:
+	
+# chmod 644  ~/.ssh/id_rsa.pub
+
+-------------------------------------------------------------------------------------
+	3. Inventory
+-------------------------------------------------------------------------------------
+/etc/ansible/hosts
+-------------------------------------------------------------------------------------
+The inventory file can be in one of many formats, depending on the inventory plugins
+you have. The format for /etc/ansible/hosts is an INI-like 
+-------------------------------------------------------------------------------------
+mail.example.com
+
+[webservers]
+foo.example.com
+bar.example.com
+
+[dbservers]
+one.example.com
+two.example.com
+three.example.com
+-------------------------------------------------------------------------------------
+A YAML version would look like:
+-------------------------------------------------------------------------------------
+all:
+  hosts:
+    mail.example.com
+  children:
+    webservers:
+      hosts:
+        foo.example.com:
+        bar.example.com:
+    dbservers:
+      hosts:
+        one.example.com:
+        two.example.com:
+        three.example.com:
+-------------------------------------------------------------------------------------
+If you have hosts that run on non-standard SSH ports you can put the port number after
+the hostname with a colon. Ports listed in your SSH config file won’t be used with
+the paramiko connection but will be used with the openssh connection.
+-------------------------------------------------------------------------------------
+badwolf.example.com:5309
+-------------------------------------------------------------------------------------
+In INI:
+-------------------------------------------------------------------------------------
+jumper ansible_port=5555 ansible_host=192.0.2.50
+-------------------------------------------------------------------------------------
+In YAML:
+-------------------------------------------------------------------------------------
+hosts:
+  jumper:
+    ansible_port: 5555
+    ansible_host: 192.0.2.50
+-------------------------------------------------------------------------------------
+If you are adding a lot of hosts following similar patterns, you can do this rather
+than listing each hostname:
+-------------------------------------------------------------------------------------
+[webservers]
+www[01:50].example.com
+
+[databases]
+db-[a:f].example.com
+-------------------------------------------------------------------------------------
+You can also select the connection type and user on a per host basis:
+-------------------------------------------------------------------------------------
+[targets]
+
+localhost              ansible_connection=local
+other1.example.com     ansible_connection=ssh        ansible_user=mpdehaan
+other2.example.com     ansible_connection=ssh        ansible_user=mdehaan
+-------------------------------------------------------------------------------------
+Host Variables
+-------------------------------------------------------------------------------------
+[atlanta]
+host1 http_port=80 maxRequestsPerChild=808
+host2 http_port=303 maxRequestsPerChild=909
+-------------------------------------------------------------------------------------
+Group Variables
+-------------------------------------------------------------------------------------
+The INI way:
+-------------------------------------------------------------------------------------
+[atlanta]
+host1
+host2
+
+[atlanta:vars]
+ntp_server=ntp.atlanta.example.com
+proxy=proxy.atlanta.example.com
+-------------------------------------------------------------------------------------
+The YAML version:
+-------------------------------------------------------------------------------------
+atlanta:
+  hosts:
+    host1:
+    host2:
+  vars:
+    ntp_server: ntp.atlanta.example.com
+    proxy: proxy.atlanta.example.com
+-------------------------------------------------------------------------------------
+Groups of Groups, and Group Variables
+-------------------------------------------------------------------------------------
+It is also possible to make groups of groups using the :children suffix in INI or the
+children: entry in YAML. You can apply variables using :vars or vars::
+-------------------------------------------------------------------------------------
+[atlanta]
+host1
+host2
+
+[raleigh]
+host2
+host3
+
+[southeast:children]
+atlanta
+raleigh
+
+[southeast:vars]
+some_server=foo.southeast.example.com
+halon_system_timeout=30
+self_destruct_countdown=60
+escape_pods=2
+
+[usa:children]
+southeast
+northeast
+southwest
+northwest
+-------------------------------------------------------------------------------------
+all:
+  children:
+    usa:
+      children:
+        southeast:
+          children:
+            atlanta:
+              hosts:
+                host1:
+                host2:
+            raleigh:
+              hosts:
+                host2:
+                host3:
+          vars:
+            some_server: foo.southeast.example.com
+            halon_system_timeout: 30
+            self_destruct_countdown: 60
+            escape_pods: 2
+       northeast:
+       northwest:
+       southwest:
+-------------------------------------------------------------------------------------
+Default groups
+-------------------------------------------------------------------------------------
+There are two default groups: all and ungrouped. all contains every host. ungrouped
+contains all hosts that don’t have another group aside from all. 
+-------------------------------------------------------------------------------------
+Splitting Out Host and Group Specific Data
+
+The preferred practice in Ansible is to not store variables in the main inventory file.
+
+In addition to storing variables directly in the inventory file, host and group
+variables can be stored in individual files relative to the inventory file (not
+directory, it is always the file).
+
+These variable files are in YAML format. Valid file extensions include
+‘.yml’, ‘.yaml’, ‘.json’, or no file extension. 
+-------------------------------------------------------------------------------------
+Assuming the inventory file path is:
+-------------------------------------------------------------------------------------
+/etc/ansible/hosts
+-------------------------------------------------------------------------------------
+/etc/ansible/group_vars/raleigh # can optionally end in '.yml', '.yaml', or '.json'
+/etc/ansible/group_vars/webservers
+/etc/ansible/host_vars/foosball
+-------------------------------------------------------------------------------------
+For instance, suppose you have hosts grouped by datacenter, and each datacenter uses
+some different servers. The data in the groupfile ‘/etc/ansible/group_vars/raleigh’
+for the ‘raleigh’ group might look like:
+-------------------------------------------------------------------------------------
+---
+ntp_server: acme.example.org
+database_server: storage.example.org
+-------------------------------------------------------------------------------------
+As an advanced use case, you can create directories named after your groups or hosts,
+and Ansible will read all the files in these directories. An example with the
+‘raleigh’ group:
+-------------------------------------------------------------------------------------
+/etc/ansible/group_vars/raleigh/db_settings
+/etc/ansible/group_vars/raleigh/cluster_settings
+-------------------------------------------------------------------------------------
+List of Behavioral Inventory Parameters
+-------------------------------------------------------------------------------------
+ansible_connection
+
+    smart, ssh or paramiko. The default is smart.
+-------------------------------------------------------------------------------------
+Specific to the NON-SSH connection:
+-------------------------------------------------------------------------------------
+ansible_host
+
+ansible_port
+
+ansible_user
+-------------------------------------------------------------------------------------
+Specific to the SSH connection:
+-------------------------------------------------------------------------------------
+ansible_ssh_pass
+
+ansible_ssh_private_key_file
+
+ansible_ssh_common_args
+
+ansible_sftp_extra_args
+
+ansible_scp_extra_args
+
+ansible_ssh_extra_args
+
+ansible_ssh_pipelining
+
+ansible_ssh_executable (added in version 2.2)
+ansible.cfg.
+
+ansible_become
+    Equivalent to ansible_sudo or ansible_su, allows to force privilege escalation
+ansible_become_method
+    Allows to set privilege escalation method
+ansible_become_user
+
+ansible_become_pass
+ansible_become_exe
+
+ansible_become_flags
+-------------------------------------------------------------------------------------
+Remote host environment parameters:
+-------------------------------------------------------------------------------------
+ansible_shell_type
+
+ansible_python_interpreter
+
+ansible_*_interpreter
+
+ansible_shell_executable
+-------------------------------------------------------------------------------------
+	4. Patterns
+-------------------------------------------------------------------------------------
+ansible <pattern_goes_here> -m <module_name> -a <arguments>
+
+ansible webservers -m service -a "name=httpd state=restarted"
+-------------------------------------------------------------------------------------
+all
+*
+-------------------------------------------------------------------------------------
+one.example.com
+one.example.com:two.example.com
+192.0.2.50
+192.0.2.*
+-------------------------------------------------------------------------------------
+ This means the host may be in either one group or the other:
+
+webservers
+webservers:dbservers
+-------------------------------------------------------------------------------------
+all machines must be in the group webservers but not in the group phoenix:
+
+webservers:!phoenix
+-------------------------------------------------------------------------------------
+This would mean the hosts must be in the group webservers and the host must also be
+in the group staging:
+
+webservers:&staging
+-------------------------------------------------------------------------------------
+all machines in the groups ‘webservers’ and ‘dbservers’ are to be managed if they are
+in the group ‘staging’ also, but the machines are not to be managed if they are in the
+group ‘phoenix’ ... whew!
+
+webservers:dbservers:&staging:!phoenix
+-------------------------------------------------------------------------------------
+webservers:!{{excluded}}:&{{required}}
+-------------------------------------------------------------------------------------
+*.example.com
+*.com
+-------------------------------------------------------------------------------------
+one*.com:dbservers
+-------------------------------------------------------------------------------------
+[webservers]
+cobweb
+webbing
+weber
+-------------------------------------------------------------------------------------
+webservers[0]       # == cobweb
+webservers[-1]      # == weber
+webservers[0:1]     # == webservers[0],webservers[1]
+                    # == cobweb,webbing
+webservers[1:]      # == webbing,weber
+-------------------------------------------------------------------------------------
+~(web|db).*\.example\.com
+-------------------------------------------------------------------------------------
+While we’re jumping a bit ahead, additionally, you can add an exclusion criteria just
+by supplying the --limit flag to /usr/bin/ansible or /usr/bin/ansible-playbook:
+
+ansible-playbook site.yml --limit datacenter2
+-------------------------------------------------------------------------------------
+And if you want to read the list of hosts from a file, prefix the file name with ‘@’.
+Since Ansible 1.2:
+
+ansible-playbook site.yml --limit @retry_hosts.txt
+-------------------------------------------------------------------------------------
+	 5. Ad-Hoc Commands
+-------------------------------------------------------------------------------------
+Parallelism and Shell Commands
+-------------------------------------------------------------------------------------
+Let’s use Ansible’s command line tool to reboot all web servers in Atlanta, 10 at a time.
+-------------------------------------------------------------------------------------
+$ ssh-agent bash
+$ ssh-add ~/.ssh/id_rsa
+$ ansible atlanta -a "/sbin/reboot" -f 10
+-------------------------------------------------------------------------------------
+$ ansible atlanta -a "/usr/bin/foo" -u username
+-------------------------------------------------------------------------------------
+ If you want to run commands through privilege escalation:
+-------------------------------------------------------------------------------------
+$ ansible atlanta -a "/usr/bin/foo" -u username --become [--ask-become-pass]
+-------------------------------------------------------------------------------------
+It is also possible to become a user other than root using --become-user:
+-------------------------------------------------------------------------------------
+$ ansible atlanta -a "/usr/bin/foo" -u username --become-user otheruser [--ask-become-pass]
+-------------------------------------------------------------------------------------
+Using the shell - Execute commands in nodes. module looks like this:
+-------------------------------------------------------------------------------------
+$ ansible raleigh -m shell -a 'echo $TERM'
+-------------------------------------------------------------------------------------
+File Transfer
+-------------------------------------------------------------------------------------
+$ ansible atlanta -m copy -a "src=/etc/hosts dest=/tmp/hosts"
+$ ansible webservers -m file -a "dest=/srv/foo/a.txt mode=600"
+$ ansible webservers -m file -a "dest=/srv/foo/b.txt mode=600 owner=mdehaan group=mdehaan"
+-------------------------------------------------------------------------------------
+Add dir and remove
+-------------------------------------------------------------------------------------
+$ ansible webservers -m file -a "dest=/path/to/c mode=755 owner=mdehaan group=mdehaan state=directory"
+$ ansible webservers -m file -a "dest=/path/to/c state=absent"
+-------------------------------------------------------------------------------------
+Managing Packages
+-------------------------------------------------------------------------------------
+Ensure a package is installed, but don’t update it:
+-------------------------------------------------------------------------------------
+$ ansible webservers -m yum -a "name=acme state=present"
+-------------------------------------------------------------------------------------
+Ensure a package is installed to a specific version:
+-------------------------------------------------------------------------------------
+$ ansible webservers -m yum -a "name=acme-1.5 state=present"
+-------------------------------------------------------------------------------------
+Ensure a package is at the latest version:
+-------------------------------------------------------------------------------------
+$ ansible webservers -m yum -a "name=acme state=latest"
+-------------------------------------------------------------------------------------
+Ensure a package is not installed:
+-------------------------------------------------------------------------------------
+$ ansible webservers -m yum -a "name=acme state=absent"
+-------------------------------------------------------------------------------------
+Users and Groups
+-------------------------------------------------------------------------------------
+$ ansible all -m user -a "name=foo password=<crypted password here>"
+$ ansible all -m user -a "name=foo state=absent"
+-------------------------------------------------------------------------------------
+Deploying From Source Control
+-------------------------------------------------------------------------------------
+Deploy your webapp straight from git:
+-------------------------------------------------------------------------------------
+$ ansible webservers -m git -a "repo=https://foo.example.org/repo.git dest=/srv/myapp version=HEAD"
+-------------------------------------------------------------------------------------
+Since Ansible modules can notify change handlers it is possible to tell Ansible to
+run specific tasks when the code is updated, such as deploying Perl/Python/PHP/Ruby
+directly from git and then restarting apache.
+-------------------------------------------------------------------------------------
+Managing Services
+-------------------------------------------------------------------------------------
+$ ansible webservers -m service -a "name=httpd state=started"
+$ ansible webservers -m service -a "name=httpd state=restarted"
+$ ansible webservers -m service -a "name=httpd state=stopped"
+-------------------------------------------------------------------------------------
+Time Limited Background Operations
+-------------------------------------------------------------------------------------
+Long running operations can be run in the background, and it is possible to check their
+status later. For example, to execute long_running_operation asynchronously in the
+background, with a timeout of 3600 seconds (-B), and without polling (-P):
+-------------------------------------------------------------------------------------
+$ ansible all -B 3600 -P 0 -a "/usr/bin/long_running_operation --do-stuff"
+-------------------------------------------------------------------------------------
+If you do decide you want to check on the job status later, you can use the async_status
+module, passing it the job id that was returned when you ran the original job in the
+background:
+-------------------------------------------------------------------------------------
+$ ansible web1.example.com -m async_status -a "jid=488359678239.2844"
+-------------------------------------------------------------------------------------
+Polling is built-in and looks like this:
+-------------------------------------------------------------------------------------
+$ ansible all -B 1800 -P 60 -a "/usr/bin/long_running_operation --do-stuff"
+-------------------------------------------------------------------------------------
+The above example says “run for 30 minutes max (-B 30*60=1800), poll for status (-P)
+every 60 seconds”.
+-------------------------------------------------------------------------------------
+Poll mode is smart so all jobs will be started before polling will begin on any
+machine. Be sure to use a high enough --forks value if you want to get all of your
+jobs started very quickly. After the time limit (in seconds) runs out (-B), the
+process on the remote nodes will be terminated.
+-------------------------------------------------------------------------------------
+Gathering Facts
+-------------------------------------------------------------------------------------
+Посмотреть переменные и их значения можно командой:
+-------------------------------------------------------------------------------------
+$ ansible -m setup test
+$ ansible all -m setup
+-------------------------------------------------------------------------------------
+It’s also possible to filter this output to just export certain facts, see the
+“setup” module documentation for details.
+-------------------------------------------------------------------------------------
+	6. Command Line Tools
+-------------------------------------------------------------------------------------
+6.1 ansible
+6.2 ansible-playbook
+6.3 ansible-vault
+6.4 ansible-galaxy
+6.5 ansible-console
+6.6 ansible-config
+6.7 ansible-doc
+6.8 ansible-inventory
+6.9 ansible-pull
+-------------------------------------------------------------------------------------
+6.1 ansible
+-------------------------------------------------------------------------------------
+Определите и запустите отдельную задачу «playbook» против набора хостов
+-------------------------------------------------------------------------------------
+ansible <host-pattern> [options]
+-------------------------------------------------------------------------------------
+это сверхпростой инструмент / framework / API для выполнения «удаленных вещей».
+эта команда позволяет вам определить и запустить отдельную задачу «playbook» против
+набора хостов
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--ask-su-pass
+
+    запросить пароль su (устаревший, использовать) 
+
+--ask-sudo-pass
+
+    попросите пароль sudo (устаревший, использование станет) 
+
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--become-method <BECOME_METHOD>
+
+    способ эскалации привилегий для использования (default = sudo), допустимые варианты:
+[sudo | su | pbrun | pfexec | doas | dzdo | ksu | руны | pmrun] 
+
+--become-user <BECOME_USER>
+
+    запускать операции как этот пользователь (по умолчанию = root) 
+
+--list-hosts
+
+    выводит список совпадающих узлов; ничего не выполняет 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--private-key , --key-file
+
+    используйте этот файл для аутентификации соединения 
+
+--scp-extra-args <SCP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к scp (например, -l) 
+
+--sftp-extra-args <SFTP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к sftp (например, -f, -l) 
+
+--ssh-common-args <SSH_COMMON_ARGS>
+
+    укажите общие аргументы для передачи sftp / scp / ssh (например, ProxyCommand) 
+
+--ssh-extra-args <SSH_EXTRA_ARGS>
+
+    укажите дополнительные аргументы для перехода только к ssh (например, -R) 
+
+--syntax-check
+
+    выполнить проверку синтаксиса в playbook, но не выполнять его 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-B <SECONDS> , --background <SECONDS>
+
+    запускается асинхронно, сбой после X секунд (по умолчанию = N / A) 
+
+-C , --check
+
+    не вносите никаких изменений; вместо этого попытайтесь предсказать некоторые
+изменения, которые могут произойти 
+
+-D , --diff
+
+    при смене (небольших) файлах и шаблонах показать различия в этих файлах;
+отлично работает с -check 
+
+-K , --ask-become-pass
+
+    запросить пароль для эскалации привилегий 
+
+-M , --module-path
+
+    дописывать путь к библиотеке модулей (по умолчанию =
+[u '/ home / jenkins / .ansible / plugins / modules', u '/ usr / share / ansible / plugins / modules']) 
+
+-P <POLL_INTERVAL> , --poll <POLL_INTERVAL>
+
+    установите интервал опроса, если используете -B (по умолчанию = 15) 
+
+-R <SU_USER> , --su-user <SU_USER>
+
+    запускать операции с su в качестве этого пользователя (по умолчанию = Нет)
+(устаревший, использование становится) 
+
+-S , --su
+
+    запускать операции с su (устаревшие, использовать) 
+
+-T <TIMEOUT> , --timeout <TIMEOUT>
+
+    переопределить таймаут соединения в секундах (по умолчанию = 10) 
+
+-U <SUDO_USER> , --sudo-user <SUDO_USER>
+
+    желаемый пользователь sudo (по умолчанию = root)
+(устаревший, использование становится) 
+
+-a <MODULE_ARGS> , --args <MODULE_ARGS>
+
+    аргументы модуля 
+
+-b , --become
+
+    запускать операции с помощью (не подразумевает подсказки пароля) 
+
+-c <CONNECTION> , --connection <CONNECTION>
+
+    тип подключения для использования (по умолчанию = умный) 
+
+-e , --extra-vars
+
+    задайте дополнительные переменные как key = value или YAML / JSON,
+если имя файла добавлено с @ 
+
+-f <FORKS> , --forks <FORKS>
+
+    указать количество параллельных процессов для использования (по умолчанию = 5) 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-i , --inventory , --inventory-file
+
+    указать путь хоста инвентаризации (по умолчанию =
+[[u '/ etc / ansible / hosts]]) или список узлов, разделенных запятыми.
+-inventory-файл устарел 
+
+-k , --ask-pass
+
+    запросить пароль для подключения 
+
+-l <SUBSET> , --limit <SUBSET>
+
+    дальнейшее ограничение выбранных хостов на дополнительный шаблон 
+
+-m <MODULE_NAME> , --module-name <MODULE_NAME>
+
+    имя модуля для выполнения (по умолчанию = команда) 
+
+-o , --one-line
+
+    конденсировать выход 
+
+-s , --sudo
+
+    запускать операции с sudo (nopasswd) (устаревшие, использовать) 
+
+-t <TREE> , --tree <TREE>
+
+    выход журнала в этот каталог 
+
+-u <REMOTE_USER> , --user <REMOTE_USER>
+
+    подключитесь к этому пользователю (по умолчанию = Нет) 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.2 ansible-playbook
+-------------------------------------------------------------------------------------
+Запускает прослушиваемые загружаемые книги, выполняя определенные задачи на целевых хостах.
+-------------------------------------------------------------------------------------
+ansible-playbook [options] playbook.yml [playbook2 ...]
+-------------------------------------------------------------------------------------
+инструмент для запуска Ansible playbooks , который представляет собой систему
+конфигурации и многоуровневого развертывания.
+-------------------------------------------------------------------------------------
+Общие параметры
+
+--ask-su-pass
+
+    запросить пароль su (устаревший, использовать) 
+
+--ask-sudo-pass
+
+    попросите пароль sudo (устаревший, использование станет) 
+
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--become-method <BECOME_METHOD>
+
+    способ эскалации привилегий для использования (default = sudo), допустимые варианты:
+[sudo | su | pbrun | pfexec | doas | dzdo | ksu | руны | pmrun] 
+
+--become-user <BECOME_USER>
+
+    запускать операции как этот пользователь (по умолчанию = root) 
+
+--flush-cache
+
+    очистить кэш фактов 
+
+--force-handlers
+
+    запускать обработчики даже в случае сбоя задачи 
+
+--list-hosts
+
+    выводит список совпадающих узлов; ничего не выполняет 
+
+--list-tags
+
+    список всех доступных тегов 
+
+--list-tasks
+
+    список всех задач, которые будут выполнены 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--private-key , --key-file
+
+    используйте этот файл для аутентификации соединения 
+
+--scp-extra-args <SCP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к scp (например, -l) 
+
+--sftp-extra-args <SFTP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к sftp (например, -f, -l) 
+
+--skip-tags
+
+    только запускать игры и задачи, чьи теги не соответствуют этим значениям 
+
+--ssh-common-args <SSH_COMMON_ARGS>
+
+    укажите общие аргументы для передачи sftp / scp / ssh (например, ProxyCommand) 
+
+--ssh-extra-args <SSH_EXTRA_ARGS>
+
+    укажите дополнительные аргументы для перехода только к ssh (например, -R) 
+
+--start-at-task <START_AT_TASK>
+
+    запустите playbook в задаче, соответствующей этому имени 
+
+--step
+
+    один шаг в секунду: подтвердите каждую задачу перед запуском 
+
+--syntax-check
+
+    выполнить проверку синтаксиса в playbook, но не выполнять его 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-C , --check
+
+    не вносите никаких изменений; вместо этого попытайтесь предсказать некоторые
+изменения, которые могут произойти 
+
+-D , --diff
+
+    при смене (небольших) файлах и шаблонах показать различия в этих файлах;
+отлично работает с -check 
+
+-K , --ask-become-pass
+
+    запросить пароль для эскалации привилегий 
+
+-M , --module-path
+
+    дописывать путь к библиотеке модулей (по умолчанию =
+[u '/ home / jenkins / .ansible / plugins / modules', u '/ usr / share / ansible / plugins / modules']) 
+
+-R <SU_USER> , --su-user <SU_USER>
+
+    запускать операции с su в качестве этого пользователя (по умолчанию = Нет)
+(устаревший, использование становится) 
+
+-S , --su
+
+    запускать операции с su (устаревшие, использовать) 
+
+-T <TIMEOUT> , --timeout <TIMEOUT>
+
+    переопределить таймаут соединения в секундах (по умолчанию = 10) 
+
+-U <SUDO_USER> , --sudo-user <SUDO_USER>
+
+    желаемый пользователь sudo (по умолчанию = root)
+(устаревший, использование становится) 
+
+-b , --become
+
+    запускать операции с помощью (не подразумевает подсказки пароля) 
+
+-c <CONNECTION> , --connection <CONNECTION>
+
+    тип подключения для использования (по умолчанию = умный) 
+
+-e , --extra-vars
+
+    задайте дополнительные переменные как key = value или YAML / JSON,
+если имя файла добавлено с @ 
+
+-f <FORKS> , --forks <FORKS>
+
+    указать количество параллельных процессов для использования (по умолчанию = 5) 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-i , --inventory , --inventory-file
+
+    указать путь хоста инвентаризации (по умолчанию = [[u '/ etc / ansible / hosts]])
+или список узлов, разделенных запятыми. -inventory-файл устарел 
+
+-k , --ask-pass
+
+    запросить пароль для подключения 
+
+-l <SUBSET> , --limit <SUBSET>
+
+    дальнейшее ограничение выбранных хостов на дополнительный шаблон 
+
+-s , --sudo
+
+    запускать операции с sudo (nopasswd) (устаревшие, использовать) 
+
+-t , --tags
+
+    только запускать игры и задачи с тегами с этими значениями 
+
+-u <REMOTE_USER> , --user <REMOTE_USER>
+
+    подключитесь к этому пользователю (по умолчанию = Нет) 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.6 ansible-config
+-------------------------------------------------------------------------------------
+Просмотр, редактирование и управление настраиваемой конфигурацией.
+-------------------------------------------------------------------------------------
+ansible-config [view|dump|list] [--help] [options] [ansible.cfg]
+-------------------------------------------------------------------------------------
+Описание
+-------------------------------------------------------------------------------------
+Класс командной строки Config
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--version
+
+    показать номер версии программы и выйти 
+
+-c <CONFIG_FILE> , --config <CONFIG_FILE>
+
+    путь к файлу конфигурации, по умолчанию используется первый файл, найденный в приоритете. 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+Действия
+-------------------------------------------------------------------------------------
+list
+
+перечислить все текущие конфиги, читающие lib / constants.py, и отображает имена
+настроек файла env и config
+
+dump
+
+Показывает текущие настройки, объединяет ansible.cfg, если указано
+
+--only-changed
+
+    Отображать только конфигурации, которые изменились с 
+
+view
+
+Отображает текущий файл конфигурации 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.3 ansible-vault
+-------------------------------------------------------------------------------------
+шифрование / дешифрование для файлов Ansible data
+-------------------------------------------------------------------------------------
+ansible-vault [create|decrypt|edit|encrypt|encrypt_string|rekey|view] [options] [vaultfile.yml]
+-------------------------------------------------------------------------------------
+Описание
+-------------------------------------------------------------------------------------
+может шифровать любой файл структурированных данных, используемый Ansible. Это может
+включать переменные group_vars / или host_vars / inventory, переменные, загруженные
+include_vars или vars_files , или файлы переменных, переданные в командной строке
+aneible -playbook с -e @ file.yml или -e @ file.json . Также включены переменные
+роли и значения по умолчанию!
+
+Поскольку Ansible задачи, обработчики и другие объекты являются данными, они также
+могут быть зашифрованы с помощью хранилища. Если вы не хотите раскрывать, какие
+переменные вы используете, вы можете полностью зашифровать отдельный файл задачи.
+
+Пароль, используемый с хранилищем, в настоящее время должен быть одинаковым для всех
+файлов, которые вы хотите использовать вместе одновременно. 
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+Действия
+-------------------------------------------------------------------------------------
+encrypt
+
+шифровать прилагаемый файл, используя секретное хранилище
+
+--output
+
+    имя выходного файла для шифрования или дешифрования; использовать - для stdout 
+
+rekey
+
+повторно зашифровать сводчатый файл с новым секретом, требуется предыдущий секрет
+encrypt_string
+
+шифровать прилагаемую строку, используя секретное хранилище
+
+-p , --prompt
+
+    Запрос строки для шифрования 
+
+-n , --name
+
+    Укажите имя переменной 
+
+--output
+
+    имя выходного файла для шифрования или дешифрования; использовать - для stdout 
+
+--stdin-name <ENCRYPT_STRING_STDIN_NAME>
+
+    Укажите имя переменной для stdin 
+
+edit
+
+открывать и расшифровывать существующий сводчатый файл в редакторе, который будет
+зашифрован снова при закрытии
+
+create
+
+создавать и открывать файл в редакторе, который будет зашифрован с секретным
+секретным хранилищем при закрытии
+
+decrypt
+
+расшифровать прилагаемый файл, используя секретное хранилище
+
+--output
+
+    имя выходного файла для шифрования или дешифрования; использовать - для stdout 
+
+view
+
+открывать, расшифровывать и просматривать существующий сводчатый файл с помощью
+пейджера, используя секретный секретный код хранилища 
+-------------------------------------------------------------------------------------
+6.4 ansible-galaxy
+-------------------------------------------------------------------------------------
+ansible-galaxy [delete|import|info|init|install|list|login|remove|search|setup] [--help] [options] ...
+-------------------------------------------------------------------------------------
+Описание
+
+для управления Ansible ролями в общих репортажах, по умолчанию это Ansible Galaxy
+https://galaxy.ansible.com . 
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--list
+
+    Перечислите всю свою интеграцию. 
+
+--remove <REMOVE_ID>
+
+    Удалите интеграцию, соответствующую заданному значению идентификатора. Используйте -list для просмотра значений идентификатора. 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-c , --ignore-certs
+
+    Игнорировать ошибки проверки сертификата SSL. 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-s <API_SERVER> , --server <API_SERVER>
+
+    Назначение сервера API 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+Действия
+-------------------------------------------------------------------------------------
+info
+
+распечатывает подробную информацию о установленной роли, а также информацию, доступную в галактическом API.
+
+--offline
+
+    Не запрашивайте галактический API при создании ролей 
+
+-p , --roles-path
+
+    Путь к каталогу, содержащему ваши роли. По умолчанию используется параметр role_path, указанный в вашем файле ansible.cfgfile (/ etc / ansible / role, если он не настроен) 
+
+search
+
+выполняет поиск ролей на сервере Ansible Galaxy
+
+-p , --roles-path
+
+    Путь к каталогу, содержащему ваши роли. По умолчанию используется параметр role_path, указанный в вашем файле ansible.cfgfile (/ etc / ansible / role, если он не настроен) 
+
+--author <AUTHOR>
+
+    Имя пользователя GitHub 
+
+--galaxy-tags <GALAXY_TAGS>
+
+    список галактических тегов для фильтрации по 
+
+--platforms <PLATFORMS>
+
+    список платформ ОС для фильтрации по 
+
+setup
+
+Установите интеграцию из ролей Github или Travis для Ansible Galaxy
+
+--list
+
+    Перечислите всю свою интеграцию. 
+
+--remove <REMOVE_ID>
+
+    Удалите интеграцию, соответствующую заданному значению идентификатора. Используйте -list для просмотра значений идентификатора. 
+
+list
+
+перечисляет роли, установленные в локальной системе, или соответствует одной роли, переданной в качестве аргумента.
+
+-p , --roles-path
+
+    Путь к каталогу, содержащему ваши роли. По умолчанию используется параметр role_path, указанный в вашем файле ansible.cfgfile (/ etc / ansible / role, если он не настроен) 
+
+remove
+
+удаляет список ролей, переданных в качестве аргументов из локальной системы.
+
+-p , --roles-path
+
+    Путь к каталогу, содержащему ваши роли. По умолчанию используется параметр role_path, указанный в вашем файле ansible.cfgfile (/ etc / ansible / role, если он не настроен) 
+
+init
+
+создает каркас скелета той роли, которая соответствует формату метаданных галактики.
+
+--offline
+
+    Не запрашивайте галактический API при создании ролей 
+
+-f , --force
+
+    Сила, перезаписывающая существующую роль 
+
+--container-enabled
+
+    Инициализируйте роль скелета с содержимым по умолчанию для роли с включенным контейнером. 
+
+--init-path <INIT_PATH>
+
+    Путь, в котором будет создана роль скелета. По умолчанию используется текущий рабочий каталог. 
+
+--role-skeleton <ROLE_SKELETON>
+
+    Путь к роли скелета, на котором должна основываться новая роль. 
+
+install
+
+использует список аргументов ролей, которые необходимо установить, если не указано значение -f. Список ролей может быть именем (которое будет загружено через API галактики и github), или это может быть локальный файл .tar.gz.
+
+-n , --no-deps
+
+    Не загружать роли, перечисленные в качестве зависимостей 
+
+-f , --force
+
+    Сила, перезаписывающая существующую роль 
+
+-i , --ignore-errors
+
+    Игнорировать ошибки и продолжить следующую заданную роль. 
+
+-p , --roles-path
+
+    Путь к каталогу, содержащему ваши роли. По умолчанию используется параметр role_path, указанный в вашем файле ansible.cfgfile (/ etc / ansible / role, если он не настроен) 
+
+-r <ROLE_FILE> , --role-file <ROLE_FILE>
+
+    Файл, содержащий список импортируемых ролей 
+
+import
+
+используется для импорта роли в Ansible Galaxy
+
+--status
+
+    Проверьте статус последнего запроса на импорт для данного github_user / github_repo. 
+
+--no-wait
+
+    Не ждите результатов импорта. 
+
+--branch <REFERENCE>
+
+    Имя ветки для импорта. По умолчанию используется ветка по умолчанию для репозитория (обычно это мастер) 
+
+--role-name <ROLE_NAME>
+
+    Имя, которое должно иметь роль, если оно отличается от имени репо 
+
+login
+
+проверить идентификацию пользователя через Github и получить токен аутентификации от Ansible Galaxy.
+
+--github-token <TOKEN>
+
+    Определите с помощью токена github вместо имени пользователя и пароля. 
+
+delete
+
+Удалить роль из Ansible Galaxy. 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.5 ansible-console
+-------------------------------------------------------------------------------------
+Консоль REPL для выполнения задач Ansible.
+-------------------------------------------------------------------------------------
+ansible-console [<host-pattern>] [options]
+-------------------------------------------------------------------------------------
+REPL, который позволяет запускать специальные задачи против выбранного инвентаря
+(на основе dominis 'ansible-shell).
+-------------------------------------------------------------------------------------
+Общие параметры
+
+--ask-su-pass
+
+    запросить пароль su (устаревший, использовать) 
+
+--ask-sudo-pass
+
+    попросите пароль sudo (устаревший, использование станет) 
+
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--become-method <BECOME_METHOD>
+
+    способ эскалации привилегий для использования (default = sudo),
+допустимые варианты: [sudo | su | pbrun | pfexec | doas | dzdo | ksu | руны | pmrun] 
+
+--become-user <BECOME_USER>
+
+    запускать операции как этот пользователь (по умолчанию = root) 
+
+--list-hosts
+
+    выводит список совпадающих узлов; ничего не выполняет 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--private-key , --key-file
+
+    используйте этот файл для аутентификации соединения 
+
+--scp-extra-args <SCP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к scp (например, -l) 
+
+--sftp-extra-args <SFTP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к sftp (например, -f, -l) 
+
+--ssh-common-args <SSH_COMMON_ARGS>
+
+    укажите общие аргументы для передачи sftp / scp / ssh (например, ProxyCommand) 
+
+--ssh-extra-args <SSH_EXTRA_ARGS>
+
+    укажите дополнительные аргументы для перехода только к ssh (например, -R) 
+
+--step
+
+    один шаг в секунду: подтвердите каждую задачу перед запуском 
+
+--syntax-check
+
+    выполнить проверку синтаксиса в playbook, но не выполнять его 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-C , --check
+
+    не вносите никаких изменений; вместо этого попытайтесь предсказать некоторые
+изменения, которые могут произойти 
+
+-D , --diff
+
+    при смене (небольших) файлах и шаблонах показать различия в этих файлах;
+отлично работает с -check 
+
+-K , --ask-become-pass
+
+    запросить пароль для эскалации привилегий 
+
+-M , --module-path
+
+    дописывать путь к библиотеке модулей (по умолчанию =
+[u '/ home / jenkins / .ansible / plugins / modules', u '/ usr / share / ansible / plugins / modules']) 
+
+-R <SU_USER> , --su-user <SU_USER>
+
+    запускать операции с su в качестве этого пользователя
+(по умолчанию = Нет) (устаревший, использование становится) 
+
+-S , --su
+
+    запускать операции с su (устаревшие, использовать) 
+
+-T <TIMEOUT> , --timeout <TIMEOUT>
+
+    переопределить таймаут соединения в секундах (по умолчанию = 10) 
+
+-U <SUDO_USER> , --sudo-user <SUDO_USER>
+
+    желаемый пользователь sudo (по умолчанию = root) (устаревший, использование становится) 
+
+-b , --become
+
+    запускать операции с помощью (не подразумевает подсказки пароля) 
+
+-c <CONNECTION> , --connection <CONNECTION>
+
+    тип подключения для использования (по умолчанию = умный) 
+
+-f <FORKS> , --forks <FORKS>
+
+    указать количество параллельных процессов для использования (по умолчанию = 5) 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-i , --inventory , --inventory-file
+
+    указать путь хоста инвентаризации (по умолчанию =
+[[u '/ etc / ansible / hosts]]) или список узлов, разделенных запятыми. -inventory-файл устарел 
+
+-k , --ask-pass
+
+    запросить пароль для подключения 
+
+-l <SUBSET> , --limit <SUBSET>
+
+    дальнейшее ограничение выбранных хостов на дополнительный шаблон 
+
+-s , --sudo
+
+    запускать операции с sudo (nopasswd) (устаревшие, использовать) 
+
+-u <REMOTE_USER> , --user <REMOTE_USER>
+
+    подключитесь к этому пользователю (по умолчанию = Нет) 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.7 ansible-doc
+-------------------------------------------------------------------------------------
+ ansible-doc [ -l |  -s ] [ опции ] [ -t <тип плагина ] [ плагин ]
+-------------------------------------------------------------------------------------
+Описание
+-------------------------------------------------------------------------------------
+отображает информацию о модулях, установленных в библиотеках Ansible. Он отображает
+краткий перечень плагинов и их краткое описание, обеспечивает распечатку строк
+DOCUMENTATION и может создать короткий «фрагмент», который можно вставить в книгу
+воспроизведения. 
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--version
+
+    показать номер версии программы и выйти 
+
+-M , --module-path
+
+    дописывать путь к библиотеке модулей (по умолчанию = 
+[u '/ home / jenkins / .ansible / plugins / modules', u '/ usr / share / ansible / plugins / modules']) 
+
+-a , --all
+
+    Только для внутреннего тестирования. Показать документацию для всех плагинов. 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-l , --list
+
+    Список доступных плагинов 
+
+-s , --snippet
+
+    Показать фрагмент плей-листа для указанных плагинов 
+
+-t <TYPE> , --type <TYPE>
+
+    Выберите тип плагина (по умолчанию «модуль») 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.8 ansible-inventory
+-------------------------------------------------------------------------------------
+ доступный ресурс [ опции ] [ хост |  группа ]
+-------------------------------------------------------------------------------------
+Описание
+-------------------------------------------------------------------------------------
+используется для отображения или сброса сконфигурированного инвентаря, поскольку Ansible видит его 
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--graph
+
+    создать график инвентаризации, если образец поставки должен быть допустимым именем группы 
+
+--host <HOST>
+
+    Выводить специфическую информацию о хосте, работает как сценарий инвентаризации 
+
+--list
+
+    Выводить всю информацию о хостах, работает как сценарий инвентаризации 
+
+--list-hosts
+
+    выводит список совпадающих узлов; ничего не выполняет 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--vars
+
+    Добавить vars в отображение графика, игнорируется, если не используется с -graph 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-i , --inventory , --inventory-file
+
+    указать путь хоста инвентаризации (по умолчанию = [[u '/ etc / ansible / hosts]])
+или список узлов, разделенных запятыми. -inventory-файл устарел 
+
+-l <SUBSET> , --limit <SUBSET>
+
+    дальнейшее ограничение выбранных хостов на дополнительный шаблон 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+
+-y , --yaml
+
+    Используйте формат YAML вместо стандартного JSON, игнорируемый для -graph 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+6.9 ansible-pull
+-------------------------------------------------------------------------------------
+ ansible-pull -U <репозиторий> [ опции ] [ <playbook.yml> ]
+-------------------------------------------------------------------------------------
+вытаскивает плейеры из репозитория VCS и выполняет их для локального хоста
+-------------------------------------------------------------------------------------
+ Работа по ssh — наиболее удобна и соответствует принципу «мы сами знаем когда нам
+что-то накатывать».
+Однако возможна работа и по принципу Ceph'a, когда на каждой подконтрольной машине
+стоит ansible-pull, мониторящий какой-то репозиторий. Как только в нём появляются
+изменения — запускается локальный самодеплой (в теории, на живую не использовал) 
+-------------------------------------------------------------------------------------
+Если у вас три с половиной VPS на Амазоне, то нет никакой разницы чем пользоваться —
+push, pull, Ansible, Chef, скрипт на баше или руками. Если у вас распределённая система
+с большим количеством серверов, виртуальных машин, софта, конфигураций и так далее, то
+наиболее скалируемый и безопасный вариант — это pull с добровольной кооперацией, когда
+не вы, а сервер «знает» когда ему обращаться к центральному хранилищу за новыми
+инструкциями и когда эти инструкции выполнять, с механизмом, позволяющим начать этот
+процесс по команде из центра. К сожалению Ansible в такой конфигурации не блещет совсем.
+С другой стороны, ниша, в которой может быть достаточно Ansible или скрипта, достаточно
+велика и большинство проектов не успевает настолько вырасти, чтобы увидеть эти проблемы
+хотя бы на горизонте.
+-------------------------------------------------------------------------------------
+это считается инвертированной архитектурой со всеми вытекающими последствиями. Вообще
+же исторически pull в Ansible был добавлен не без драм (с пассажами вроде «только
+идиот может хотеть pull», это почти дословная цитата) и с тех пор живёт там по
+остаточному принципу.
+-------------------------------------------------------------------------------------
+=====================================================================================
+используется для удаленного удаленного доступа на каждом управляемом узле, каждый из
+которых запускается через cron и обновляет источник воспроизведения в исходном
+репозитории. Это инвертирует стандартную push- архитектуру, недоступную для архитектуры
+pull , которая имеет почти неограниченный потенциал масштабирования.
+
+Плей-панель настройки может быть настроена для изменения частоты cron, местоположения
+ведения журнала и параметров до невозможного. Это полезно как для экстремального
+масштабирования, так и для периодической реабилитации. Использование модуля «выборки»
+для извлечения журналов из несложных тиражей было бы отличным способом сбора и анализа
+удаленных журналов из-за недоступности.
+
+=====================================================================================
+-------------------------------------------------------------------------------------
+Общие параметры
+-------------------------------------------------------------------------------------
+--accept-host-key
+
+    добавляет ключ хоста для URL репо, если он еще не добавлен 
+
+--ask-su-pass
+
+    запросить пароль su (устаревший, использовать) 
+
+--ask-sudo-pass
+
+    попросите пароль sudo (устаревший, использование станет) 
+
+--ask-vault-pass
+
+    спросить пароль хранилища 
+
+--check
+
+    не вносите никаких изменений; вместо этого попытайтесь предсказать некоторые
+изменения, которые могут произойти 
+
+--clean
+
+    измененные файлы в рабочем репозитории будут отброшены 
+
+--full
+
+    Сделайте полный клон, а не мелкий. 
+
+--list-hosts
+
+    выводит список совпадающих узлов; ничего не выполняет 
+
+--new-vault-id <NEW_VAULT_ID>
+
+    новый идентификатор хранилища для использования в качестве ключа 
+
+--new-vault-password-file
+
+    новый файл паролей хранилища для rekey 
+
+--private-key , --key-file
+
+    используйте этот файл для аутентификации соединения 
+
+--purge
+
+    очистка после запуска плейбука 
+
+--scp-extra-args <SCP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к scp (например, -l) 
+
+--sftp-extra-args <SFTP_EXTRA_ARGS>
+
+    укажите дополнительные аргументы, чтобы перейти только к sftp (например, -f, -l) 
+
+--skip-tags
+
+    только запускать игры и задачи, чьи теги не соответствуют этим значениям 
+
+--ssh-common-args <SSH_COMMON_ARGS>
+
+    укажите общие аргументы для передачи sftp / scp / ssh (например, ProxyCommand) 
+
+--ssh-extra-args <SSH_EXTRA_ARGS>
+
+    укажите дополнительные аргументы для перехода только к ssh (например, -R) 
+
+--track-subs
+
+    подмодули будут отслеживать последние изменения. Это эквивалентно заданию
+флага -remote для обновления подмодуля git 
+
+--vault-id
+
+    идентификатор хранилища для использования 
+
+--vault-password-file
+
+    файл паролей хранилища 
+
+--verify-commit
+
+    проверьте подпись GPG проверочного фиксации, если он не выполнил прервать
+запуск playbook. Для поддержки такой операции необходим соответствующий модуль VCS 
+
+--version
+
+    показать номер версии программы и выйти 
+
+-C <CHECKOUT> , --checkout <CHECKOUT>
+
+    branch / tag / commit для проверки. По умолчанию используется поведение
+модуля репозитория. 
+
+-K , --ask-become-pass
+
+    запросить пароль для эскалации привилегий 
+
+-M , --module-path
+
+    дописывать путь к библиотеке модулей (по умолчанию =
+[u '/ home / jenkins / .ansible / plugins / modules', u '/ usr / share / ansible / plugins / modules']) 
+
+-T <TIMEOUT> , --timeout <TIMEOUT>
+
+    переопределить таймаут соединения в секундах (по умолчанию = 10) 
+
+-U <URL> , --url <URL>
+
+    URL-адрес репозитория 
+
+-c <CONNECTION> , --connection <CONNECTION>
+
+    тип подключения для использования (по умолчанию = умный) 
+
+-d <DEST> , --directory <DEST>
+
+    в хранилище для проверки 
+
+-e , --extra-vars
+
+    задайте дополнительные переменные как key = value или YAML / JSON,
+если имя файла добавлено с @ 
+
+-f , --force
+
+    запустите программу воспроизведения, даже если репозиторий не может быть обновлен 
+
+-h , --help
+
+    показать это справочное сообщение и выйти 
+
+-i , --inventory , --inventory-file
+
+    указать путь хоста инвентаризации (по умолчанию =
+[[u '/ etc / ansible / hosts]]) или список узлов, разделенных запятыми.
+-inventory-файл устарел 
+
+-k , --ask-pass
+
+    запросить пароль для подключения 
+
+-l <SUBSET> , --limit <SUBSET>
+
+    дальнейшее ограничение выбранных хостов на дополнительный шаблон 
+
+-m <MODULE_NAME> , --module-name <MODULE_NAME>
+
+    Имя модуля репозитория, которое будет использоваться для проверки репо.
+По умолчанию git. 
+
+-o , --only-if-changed
+
+    только запустите playbook, если репозиторий обновлен 
+
+-s <SLEEP> , --sleep <SLEEP>
+
+    спящий режим для случайного интервала (от 0 до n секунд) перед запуском.
+Это полезный способ разогнать запросы git 
+
+-t , --tags
+
+    только запускать игры и задачи с тегами с этими значениями 
+
+-u <REMOTE_USER> , --user <REMOTE_USER>
+
+    подключитесь к этому пользователю (по умолчанию = Нет) 
+
+-v , --verbose
+
+    verbose mode (-vvv для больше, -vvvv для включения отладки соединения) 
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	7. Playbooks
+-------------------------------------------------------------------------------------
+7.1 Пример
+7.2 Работа с результатами выполнения модуля
+7.3 Ошибка
+7.4 Правилах написания YAML-файлов
+7.5 Include
+7.6 Переменные
+7.6.1 Приоритет переменных
+7.7 Условия
+7.8 Циклы
+7.9 Роли
+7.10 Handlers
+7.11 Фильтры Jinja2
+7.12 Тесты Jinja2
+-------------------------------------------------------------------------------------
+/etc/ansible/playbooks
+-------------------------------------------------------------------------------------
+play - это набор задач, которые нужно выполнить для группы хостов
+task - это конкретная задача. В задаче есть как минимум:
+	- описание (название задачи можно не писать, но очень рекомендуется)
+	- модуль и команда (действие в модуле)
+-------------------------------------------------------------------------------------
+	7.1 Пример:
+-------------------------------------------------------------------------------------
+---
+- name: Run show commands on routers
+  hosts: cisco-routers
+  gather_facts: false
+  tasks:
+    - name: run sh ip int br
+      raw: sh ip int br | ex unass
+
+    - name: run sh ip route
+      raw: sh ip route
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+
+  - name: Install package nginx
+    apt: name=nginx update_cache=yes
+    sudo: yes
+
+  - name: Starting service nginx
+    service: name=nginx state=started
+    sudo: yes
+-------------------------------------------------------------------------------------
+$ ansible-playbook 1_show_commands_with_raw.yml  #-v 
+-------------------------------------------------------------------------------------
+	7.2 Работа с результатами выполнения модуля
+-------------------------------------------------------------------------------------
+-v -vv -vvv, verbose	#отобразить результат выполнения команд
+-------------------------------------------------------------------------------------
+ - changed - ключ, который указывает, были ли внесены изменения
+ - rc - return code. Это поле появляется в выводе тех модулей, которые выполняют
+ - какие-то команды
+ - stderr - ошибки при выполнении команды. Это поле появляется в выводе тех
+ - модулей, которые выполняют какие-то команды
+ - stdout - вывод команды
+ - stdout_lines - вывод в виде списка команд, разбитых построчно
+-------------------------------------------------------------------------------------
+---
+- name: Run show commands on routers
+  hosts: cisco-routers
+  gather_facts: false
+
+  tasks:
+    - name: run sh ip int br
+      raw: sh ip int br | ex unass
+      register: sh_ip_int_br_result
+
+    - name: Debug registered var
+      debug: var=sh_ip_int_br_result.stdout_lines
+
+    - name: Debug registered var
+      debug:
+        msg: "Error in command"
+      when: "'invalid' in sh_ip_int_br_result.stdout"
+-------------------------------------------------------------------------------------
+register	# сохраняет результат выполнения модуля в переменную
+-------------------------------------------------------------------------------------
+debug		# позволяет отображать информацию на стандартный поток вывода
+-------------------------------------------------------------------------------------
+when		# можно указать условие, при выполнении которого
+		# задача выполняется. Если условие не выполняется, то задача пропускается
+
+это условие означает, что задача будет выполнена только в том случае, если в выводе
+sh_ip_int_br_result.stdout будет найдена строка invalid (например, когда неправильно
+введена команда)
+
+сообщения skipping - это означает, что задача не выполнялась потому, что условие в when не было
+выполнено
+-------------------------------------------------------------------------------------
+	7.3 Ошибка
+-------------------------------------------------------------------------------------
+Если при выполнении playbook, на каком-то устройстве возникла ошибка, Ansible
+создает специальный файл, который называется точно так же, как playbook, но
+расширение меняется на retry. 
+-------------------------------------------------------------------------------------
+$ ansible-playbook 1_show_commands_with_raw.yml --limit @/home/vagrant/repos/pyneng-ex
+amples-exercises/examples/23_ansible_basics/2_playbook_basics/1_show_commands_with_raw
+.retry
+-------------------------------------------------------------------------------------
+$ ansible-playbook 1_show_commands_with_raw.yml --limit @1_show_commands_with_raw.retry
+$ ansible-playbook 1_show_commands_with_raw.yml --limit 192.168.100.1
+-------------------------------------------------------------------------------------
+Параметр --limit очень полезная вещь. Он позволяет ограничивать, для каких хостов
+или групп будет выполняться playbook, при этом не меняя сам playbook.
+-------------------------------------------------------------------------------------
+Работа над ошибками
+-------------------------------------------------------------------------------------
+https://habrahabr.ru/post/305400/
+-------------------------------------------------------------------------------------
+Ansible содержит классную особенность: он остановит всю обработку, если что-то пошло
+не так. Мы используем эту особенность чтобы остановить плейбук, когда конфигурация
+не валидна.
+-------------------------------------------------------------------------------------
+Возврат при проблемах
+-------------------------------------------------------------------------------------
+Это не система резервного копирования, и она не умеет отказывать все к прошлым состояниям.
+Безопасность плейбуков – ваша ответственность. Ansible просто не знает, как отменить
+эффект a2ensite awesome-app.
+-------------------------------------------------------------------------------------
+Как было сказано ранее, если задача не может исполниться – обработка останавливается…
+но мы можем принять ошибку (и нам нужно это делать). Так мы и поступим: продолжим
+обработку в случае ошибки, но только чтобы вернуть все к рабочему состоянию.
+-------------------------------------------------------------------------------------
+- hosts: web
+  tasks:
+    - name: Installs apache web server
+      apt: pkg=apache2 state=installed update_cache=true
+
+    - name: Push future default virtual host configuration
+      copy: src=files/awesome-app dest=/etc/apache2/sites-available/ mode=0640
+
+    - name: Activates our virtualhost
+      command: a2ensite awesome-app
+
+    - name: Check that our config is valid
+      command: apache2ctl configtest
+      register: result
+      ignore_errors: True
+
+    - name: Rolling back - Restoring old default virtualhost
+      command: a2ensite default
+      when: result|failed
+
+    - name: Rolling back - Removing our virtualhost
+      command: a2dissite awesome-app
+      when: result|failed
+
+    - name: Rolling back - Ending playbook
+      fail: msg="Configuration file is not valid. Please check that before re-running the playbook."
+      when: result|failed
+    
+    - name: Deploy our awesome application
+      git: repo=https://github.com/leucos/ansible-tuto-demosite.git dest=/var/www/awesome-app
+      tags: deploy
+
+    - name: Deactivates the default virtualhost
+      command: a2dissite default
+
+    - name: Deactivates the default ssl virtualhost
+      command: a2dissite default-ssl
+
+    notify:
+        - restart apache
+
+  handlers:
+    - name: restart apache
+      service: name=apache2 state=restarted
+-------------------------------------------------------------------------------------
+Ключевое слово register записывает вывод команды apache2ctl configtest (exit
+status, stdout, stderr, ...), и when: result|failed проверяет, содержит ли переменная
+(result) статус failed.
+-------------------------------------------------------------------------------------
+Кажется, все работает как нужно. Давайте попробуем перезапустить apache:
+
+$ ansible -i step-07/hosts -m service -a 'name=apache2 state=restarted' host1.example.org
+host1.example.org | success >> {
+    "changed": true,
+    "name": "apache2",
+    "state": "started"
+}
+-------------------------------------------------------------------------------------
+Теперь наш Apache защищен от ошибок конфигурации. Помните, переменными можно
+пользоваться практически везде, так что этот плейбук можно использовать для apache и
+в других случаях. Напишите один раз и пользуйтесь везде.
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	7.4 Правилах написания YAML-файлов
+-------------------------------------------------------------------------------------
+
+    - все YAML-файлы должны начинаться с "---". Эта часть формата YAML означает начало документа;
+    - члены списка должны начинаться с пробела или "-" и иметь одинаковые отступы от начала строки;
+    - комментарии начинаются с символа "#";
+    - словарь описывается в виде «ключ» ": " «значение» и может быть представлен в сокращенной форме.
+
+-------------------------------------------------------------------------------------
+	7.5 Include
+-------------------------------------------------------------------------------------
+С помощью выражения include, в playbook можно добавлять:
+задачи
+handlers
+сценарий (play)
+playbook
+файлы с переменными (используют другое ключевое слово)
+-------------------------------------------------------------------------------------
+---
+- name: Run cfg commands on routers
+  hosts: cisco-routers
+  gather_facts: false
+  connection: local
+  
+  tasks:
+      - name: Disable services
+      ios_config:
+        lines:
+	  - no ip http server
+	  - no ip http secure-server
+	  - no ip domain lookup
+	provider: "{{ cli }}"
+      notify: save config
+
+    - include: tasks/cisco_ospf_cfg.yml
+    - include: tasks/cisco_vty_cfg.yml
+
+  handlers:
+    - name: save config
+      ios_command:
+        commands:
+	   - write
+	provider: "{{ cli }}"
+
+-------------------------------------------------------------------------------------
+	7.6 Переменные
+-------------------------------------------------------------------------------------
+Переменной может быть, например:
+информация об устройстве, которая собрана как факт, а затем используется в
+шаблоне.
+в переменные можно записывать полученный вывод команды.
+переменная может быть указана вручную в playbook
+-------------------------------------------------------------------------------------
+Переменные могут состоять из букв, чисел и символа _
+Переменные должны начинаться с буквы
+-------------------------------------------------------------------------------------
+R1:
+  IP: 10.1.1.1/24
+  DG: 10.1.1.100
+-------------------------------------------------------------------------------------
+Переменные можно создавать:
+	в инвентарном файле
+	в playbook
+	в специальных файлах для группы/устройства
+	в отдельных файлах, которые добавляются в playbook через include (как в Jinja2)
+	в ролях, которые затем используются
+	можно даже передавать переменные при вызове playbook
+	Также можно использовать факты, которые были собраны про устройство, как переменные.
+-------------------------------------------------------------------------------------
+В инвентарном файле можно указывать переменные для группы:
+
+[cisco-routers]
+192.168.100.1
+192.168.100.2
+192.168.100.3
+
+[cisco-switches]
+192.168.100.100
+
+[cisco-routers:vars]
+ntp_server=192.168.255.100
+log_server=10.255.100.1
+-------------------------------------------------------------------------------------
+Переменные в playbook
+
+---
+- name: Run show commands on routers
+  hosts: cisco-routers
+  gather_facts: false
+  vars:
+    ntp_server: 192.168.255.100
+    log_server: 10.255.100.1
+  tasks:
+    - name: run sh ip int br
+      raw: sh ip int br | ex unass
+    - name: run sh ip route
+      raw: sh ip route
+-------------------------------------------------------------------------------------
+Ansible позволяет хранить переменные для группы/устройства в специальных файлах:
+-------------------------------------------------------------------------------------
+Все файлы с переменными должны быть в формате YAML. Расширение файла
+может быть таким: yml, yaml, json или без расширения
+
+ group_vars, (файл all)/host_vars -> /etc/ansible/
+
+Располагаются в том же каталоге, что и playbook, или могут находиться внутри каталога inventory.
+Если каталоги и файлы названы правильно и расположены в указанных
+каталогах, Ansible сам распознает файлы и будет использовать переменные
+-------------------------------------------------------------------------------------
+Можно создать такую структуру каталогов:
+├── group_vars _
+│ ├── all.yml |
+│ ├── cisco-routers.yml | Каталог с переменными для групп устройств
+│ └── cisco-switches.yml _|
+| ├──
+host_vars _
+│ ├── 192.168.100.1 |
+│ ├── 192.168.100.2 |
+│ ├── 192.168.100.3 | Каталог с переменными для устройств
+│ └── 192.168.100.100 _|
+| └──
+myhosts | Инвентарный файл
+-------------------------------------------------------------------------------------
+all.yml (в этом файле указываются значения по умолчанию, которые
+относятся ко всем устройствам):
+---
+cli:
+  host: "{{ inventory_hostname }}"
+  username: "cisco"
+  password: "cisco"
+  transport: cli
+  authorize: yes
+  auth_pass: "cisco"
+-------------------------------------------------------------------------------------
+ - inventory_hostname - это специальная переменная, которая указывает на тот хост,
+для которого Ansible выполняет действия.
+ - синтаксис {{ inventory_hostname }} - это подстановка переменных. Используется
+формат Jinja
+-------------------------------------------------------------------------------------
+group_vars/cisco-routers.yml
+---
+log_server: 10.255.100.1
+ntp_server: 10.255.100.1
+users:
+user1: pass1
+user2: pass2
+user3: pass3
+-------------------------------------------------------------------------------------
+	7.6.1 Приоритет переменных (последние значения переписывают предыдущие):
+-------------------------------------------------------------------------------------
+Значения переменных в ролях
+задачи в ролях будут видеть собственные значения. Задачи, которые
+определены вне роли, будут видеть последние значения переменных роли
+переменные в инвентарном файле
+переменные для группы хостов в инвентарном файле
+переменные для хостов в инвентарном файле
+переменные в каталоге group_vars
+переменные в каталоге host_vars
+факты хоста
+переменные сценария (play)
+переменные сценария, которые запрашиваются через vars_prompt
+переменные, которые передаются в сценарий через vars_files
+переменные, полученные через параметр register
+set_facts
+переменные из роли и помещенные через include
+переменные блока (переписывают другие значения только для блока)
+переменные задачи (task) (переписывают другие значения только для задачи)
+переменные, которые передаются при вызове playbook через параметр --extra-vars
+(всегда наиболее приоритетные)
+-------------------------------------------------------------------------------------
+# touch /etc/ansible/playbooks/install_apache.yml
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+ 
+  - name: Debug
+    debug: msg={{ ansible_os_family }}
+ 
+  - set_fact: package_name=httpd
+    when: ansible_os_family == "Redhat"
+ 
+  - set_fact: package_name=apache2
+    when: ansible_os_family == "Debian"
+ 
+  - name: Install httpd package
+    yum: name={{ package_name }} state=latest
+    sudo: yes
+    when: ansible_os_family == "Redhat"
+   
+  - name: Debug1
+    debug: msg={{ package_name }}
+ 
+  - name: Install apache2 package
+    apt: name={{ package_name }} state=latest
+    sudo: yes
+    when: ansible_os_family == "Debian"
+-------------------------------------------------------------------------------------
+В Ansible переменные можно задавать в отдельном (глобальном) файле, а потом включать этот файл в playbook с помощью ключевого слова vars_files:. Например, у нас есть файл с переменными /etc/ansible/vars/test_var.yml с таким содержанием:
+---
+package_name: "apache2"
+
+В наборе инструкций включение этого файла с переменными будет выглядеть следующим образом:
+---
+- hosts: test
+  vars_files:
+    - /etc/ansible/vars/test_var.yml
+  tasks:
+    ...
+-------------------------------------------------------------------------------------
+Также есть возможность устанавливать переменные непосредственно в playbook с помощью ключевого слова vars:, выглядит это так:
+---
+- hosts: test
+  vars:
+    - package_name: "apache2"
+  tasks:
+    ...
+-------------------------------------------------------------------------------------
+Посмотреть переменные и их значения можно командой:
+
+# ansible -m setup test
+-------------------------------------------------------------------------------------
+	7.7 Условия
+-------------------------------------------------------------------------------------
+Чтобы задачи выполнялись только в определенном случае, можно (и нужно) указывать
+условия с помощью when:.
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+ 
+  - name: Debug
+    debug: msg={{ ansible_os_family }}
+ 
+  - set_fact: package_name=httpd
+    when: ansible_os_family == "Redhat"
+ 
+  - set_fact: package_name=apache2
+    when: ansible_os_family == "Debian"
+ 
+  - name: Install httpd package
+    yum: name={{ package_name }} state=latest
+    sudo: yes
+    when: ansible_os_family == "Redhat"
+   
+  - name: Debug1
+    debug: msg={{ package_name }}
+ 
+  - name: Install apache2 package
+    apt: name={{ package_name }} state=latest
+    sudo: yes
+    when: ansible_os_family == "Debian"
+-------------------------------------------------------------------------------------
+В условиях в Ansible для сравнения используются == (равно), != (не равно), > (больше),
+< (меньше), >= (больше равно), <= (меньше равно). Можно также указать несколько условий
+с помощью операторов and (и) и or (или). Для проверки вхождения символа или подстроки
+в строку используются операторы in и not.
+-------------------------------------------------------------------------------------
+	7.8 Циклы
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+ 
+  - name: Install packages
+    apt: name={{ item }} state=latest
+    with_items:
+    - htop
+    - mytop
+    - wget
+    sudo: yes
+-------------------------------------------------------------------------------------
+Playbook будет запущен один раз, но модуль apt будет вызываться для каждого указанного пакета:
+-------------------------------------------------------------------------------------
+# ansible-playbook install_packages.yml 
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+   - name: Add test users
+     user: name={{ item.name }} state=present groups={{ item.groups }}
+     with_items:
+      - { name: 'user1', groups: 'adm'  }
+      - { name: 'user2', groups: 'lpadmin' }
+     sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook add_users.yml 
+-------------------------------------------------------------------------------------
+    Примечание. Больше примеров с использованием циклов можно найти в официальной
+документации по Ansible http://docs.ansible.com/ansible/playbooks_loops.html
+-------------------------------------------------------------------------------------
+	7.9 Роли
+-------------------------------------------------------------------------------------
+В архитектуре проекта обычно сервера разделяются по своему предназначению и выполняют
+определенную роль - web-сервер, сервер баз данных, почтовый сервер и т. д. 
+-------------------------------------------------------------------------------------
+---
+- hosts: servers
+  roles:
+     - web
+     – db
+     - post
+-------------------------------------------------------------------------------------
+Тогда файловая структура ролей может выглядеть таким образом:
+
+site.yml
+servers.yml
+roles/
+   web/
+     files/
+     templates/
+     tasks/
+     handlers/
+     vars/
+     defaults/
+     meta/
+   db/
+     files/
+     templates/
+     tasks/
+     handlers/
+     vars/
+     defaults/
+     meta/
+   post/
+     files/
+     templates/
+     tasks/
+     handlers/
+     vars/
+     defaults/
+     meta/
+
+-------------------------------------------------------------------------------------
+Примечание. Файловая структура не обязательно должна выглядеть так - если какой-либо
+каталог отсутствует в роли, то он будет проигнорирован и набор инструкций будет
+выполняться дальше
+-------------------------------------------------------------------------------------
+Путь к каталогу с ролями можно задать с помощью параметра roles_path в конфигурационном
+файле Ansible. При указании ролей можно использовать тэги.
+
+Также для каждой роли будут применяться следующие правила:
+-------------------------------------------------------------------------------------
+
+    если существует roles/.../tasks/main.yml, то задачи из этого файла будут добавлены в набор инструкций;
+    если существует roles/.../handlers/main.yml, то обработчики из этого файла будут добавлены в набор инструкций;
+    если существует roles/.../vars/main.yml, то переменные из этого файла будут добавлены в набор инструкций;
+    если существует roles/.../meta/main.yml, то любые роли-зависимости будут добавлены в список ролей;
+    задача копирования может ссылаться на файл в roles/.../files без указания абсолютного или относительного пути;
+    скриптовая задача может ссылаться на скрипт в roles/.../files без указания абсолютного или относительного пути;
+    задача шаблонизации может ссылаться на roles/.../templates без указания абсолютного или относительного пути;
+    импортируемые задачи могут ссылаться на файлы в roles/.../tasks без указания абсолютного или относительного пути.
+
+-------------------------------------------------------------------------------------
+Ansible Galaxy - крупнейший репозиторий ролей Ansible, там можно брать уже готовые
+роли (например, для обучения) или делиться своими ролями.
+https://galaxy.ansible.com/list#/roles?page=1&page_size=10
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	7.10 Handlers
+-------------------------------------------------------------------------------------
+Handlers - это специальные задачи. Они вызываются из других задач ключевым
+словом notify.
+
+Эти задачи срабатывают после выполнения всех задач в сценарии (play). При этом,
+если несколько задач вызвали одну и ту же задачу через notify, она выполниться
+только один раз.
+-------------------------------------------------------------------------------------
+---
+- name: Run cfg commands on routers
+  hosts: cisco-routers
+  gather_facts: false
+  connection: local
+  
+  tasks:
+    - name: Config line vty
+      ios_config:
+	parents:
+	  - line vty 0 4
+	lines:
+- login local
+- transport input ssh
+	provider: "{{ cli }}"
+      notify: save config
+    - name: Send config commands
+      ios_config:
+        lines:
+	  - service password-encryption
+	  - no ip http server
+	  - no ip http secure-server
+	  - no ip domain lookup
+	provider: "{{ cli }}"
+      notify: save config
+  handlers:
+    - name: save config
+      ios_command:
+        commands:
+	   - write
+	provider: "{{ cli }}"
+-------------------------------------------------------------------------------------
+$ ansible-playbook 8_handlers.yml
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	7.11 Фильтры Jinja2
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	7.12 Тесты Jinja2
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	8. Module
+-------------------------------------------------------------------------------------
+ - core
+ - extra
+-------------------------------------------------------------------------------------
+8.1 command/shell/script/raw/file/copy/cron/template/action
+-------------------------------------------------------------------------------------
+8.2 setup/yum/apt/fetch/mail/lineinfile/fail/systemctl/service
+-------------------------------------------------------------------------------------
+8.3 user/become/sudo/selinux
+-------------------------------------------------------------------------------------
+8.4 git/jenkins
+-------------------------------------------------------------------------------------
+8.5 ios_facts/ios_command/ios_config/ntc_ansible/set_fact/snmp_fact
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+System_M
+-------------------------------------------------------------------------------------
+Database_M
+-------------------------------------------------------------------------------------
+Web Infrastructure_M
+-------------------------------------------------------------------------------------
+Storage_M
+-------------------------------------------------------------------------------------
+Network_M
+-------------------------------------------------------------------------------------
+Net Tools_M
+-------------------------------------------------------------------------------------
+Monitoring_M
+-------------------------------------------------------------------------------------
+Проблемы с удалением docker-контейнеров: device or resource busy
+    Использование модуля nginx-module-vts для сбора расширенной статистики Nginx
+    Верификация коммитов в GitLab 9.5.x
+    Docker совет №4: Структура проекта с несколькими Dockerfile и docker-compose
+    Установка и активация Atlassian Confluence 6.3.4
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	8.1 command/shell/script/raw/file/copy/cron/template/action
+-------------------------------------------------------------------------------------
+	Модуль command принимает команду и аргументы, разделенные пробелом.
+-------------------------------------------------------------------------------------
+Аргументами могут быть:
+-------------------------------------------------------------------------------------
+    chdir — переход в каталог для выполнения команды;
+    creates — создание файла по указанному пути;
+    removes — удаление файла по указанному пути.
+
+Для проверки работы модуля command напишем набор инструкций
+/etc/ansible/playbooks/install_ntpdate.yml такого вида:
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  tasks:
+ 
+  - name: Check if ntpdate is installed
+    command: dpkg-query -W ntpdate
+    register: ntpdate_check_deb
+    failed_when: ntpdate_check_deb.rc > 1
+    changed_when: ntpdate_check_deb.rc == 1
+ 
+  - name: Install ntpdate
+    apt: name=ntpdate update_cache=yes
+    sudo: yes
+    when: ntpdate_check_deb.rc == 1
+ 
+  - name: Sync date
+    command: ntpdate -u 192.168.0.13
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook install_ntpdate.yml 
+-------------------------------------------------------------------------------------
+	Модуль shell — это аналог модуля command с важным отличием: 
+для выполнения команд используется оболочка /bin/sh. 
+-------------------------------------------------------------------------------------Параметры такие же, как и у модуля command — chdir, creates и removes.
+-------------------------------------------------------------------------------------
+Модуль script используют при необходимости копирования скрипта на удаленный хост с 
+последующим выполнением. Поддерживаются параметры creates и removes. Для проверки
+работы данного модуля напишем простейший скрипт 
+-------------------------------------------------------------------------------------/etc/ansible/playbooks/scripts/count_dir.sh со следующим содержимым:
+-------------------------------------------------------------------------------------
+#/bin/bash
+ls -l /var/log | grep "^d" | wc -l
+-------------------------------------------------------------------------------------
+    Примечание. Скрипт посчитает количество директорий в /var/log
+-------------------------------------------------------------------------------------
+Playbook в этом случае будет выглядеть так:
+---
+- hosts: test
+  tasks:
+ 
+  - name: Count directories in /var/log
+    script: /etc/ansible/playbooks/scripts/count_dir.sh /var/log
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook -vv count_directories.yml 
+-------------------------------------------------------------------------------------
+
+TASK: [Count directories in /var/log] ***************************************** 
+changed: [test-1] => {"changed": true, "rc": 0, "stderr": "", "stdout": "15\r\n"}
+
+-------------------------------------------------------------------------------------
+	Модуль raw предусмотрен для использования в случаях, когда другие командные
+модули (command, shell и script) использовать невозможно. Этот модуль можно
+использовать на удаленных хостах даже без установленного Python.
+-------------------------------------------------------------------------------------playbook:
+---
+- hosts: test
+  tasks:
+ 
+  - name: Update & safe-upgrade
+    raw: aptitude update && aptitude safe-upgrade -y
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook safe_upgrade.yml 
+-------------------------------------------------------------------------------------
+	Модуль file предназначен для создания/удаления каталогов, символических ссылок
+и файлов, а также для работы с атрибутами файлов. Параметры:
+-------------------------------------------------------------------------------------
+    group — имя группы-владельца файла/каталога;
+    owner — имя пользователя-владельца файла/каталога;
+    mode — права доступа к файлу/каталогу;
+    path — путь к файлу/каталогу (можно использовать алиасы dest или name);
+    src — путь к файлу, для создания симлинка (используется при state=link);
+    recurse — рекурсивно установить атрибуты файла/каталога (используется при state=directory);
+    state — определяет типы файлов, над которым проводятся операции (file, link, directory, hard, touch и absent).
+-------------------------------------------------------------------------------------
+Пример использования модуля в наборе инструкций:
+---
+- hosts: test
+  vars:
+    dir: /home/admin/testdir
+  tasks:
+ 
+  - name: Create directory 
+    file: path={{ dir }} state=directory owner=admin group=admin mode=0777
+    sudo: yes
+ 
+  - name: Create symlink
+    file: src=/etc/hostname dest=/home/admin/testdir/hostname owner=root group=root state=link
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook mkdir.yml 
+-------------------------------------------------------------------------------------
+	Модуль copy используется для копирования файлов на удаленный хост. Кроме уже
+описанных выше параметров group, owner, mode может принимать следующие:
+-------------------------------------------------------------------------------------
+    backup — создает резервную копию файла (в имени файла будет дописан timestamp);
+    dest — куда будет скопирован файл (абсолютный путь на удаленном хосте);
+    directory_mode — используется для рекурсивного копирования каталогов;
+    force — копировать файл на удаленный хост, если содержимое файла было изменено;
+    src — откуда копировать файл — локальный путь (абсолютный или относительный).
+-------------------------------------------------------------------------------------
+Пример использования в наборе инструкций:
+---
+- hosts: test
+  tasks:
+ 
+  - name: Copy speedtest-cli
+    copy: src=/home/install/speedtest-cli dest=/usr/local/bin/speedtest-cli mode=0777
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook copy.yml 
+-------------------------------------------------------------------------------------
+	Для управления планировщиком задач используется модуль cron. Может принимать
+следующие параметры:
+-------------------------------------------------------------------------------------
+    backup — создает резервную перед изменением;
+    cron_file — использует указанный файл из каталога cron.d вместо пользовательского crontab;
+    day — день запуска задачи (1-31, *, */2);
+    hour — час запуска задачи (0-23, *, */2);
+    minute — минута запуска задачи (0-59, *, */2);
+    month — месяц запуска задачи (1-12, *, */2);
+    weekday — неделя запуска задачи (0-6 for Sunday-Saturday, *);
+    disabled — закомментировать ранее добавленную задачу;
+    job — задача;
+    name — описание задачи в crontab (комментарий);
+    state — существует ли такая задача(принимает значения present и absent);
+    user — пользователь, в чей crontab следует добавить задачу;
+    special_time — специальное время запуска задачи (reboot, yearly, annually, monthly, weekly, daily и hourly).
+-------------------------------------------------------------------------------------
+Пример playbook с использованием модуля cron:
+---
+- hosts: test
+  tasks:
+ 
+  - name: Add task to cron
+    cron: name="check speedtest" minute="0" hour="1,10" job="/usr/local/bin/speedtest.sh"
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook cron.yml 
+-------------------------------------------------------------------------------------
+	Модуль template используется в Ansible для создания файлов по определенным
+шаблонам (например, конфигов) на удаленных хостах. 
+-------------------------------------------------------------------------------------
+Чтобы проверить работу данного модуля, создадим простенький шаблон
+/etc/ansible/playbooks/templates/hostname/ с таким содержимым:
+
+This is test file on {{ ansible_hostname }}
+
+-------------------------------------------------------------------------------------
+Playbook с использованием модуля template получится такой:
+---
+- hosts: test
+  tasks:
+ 
+  - name: Create template with hostname
+    template: src=/etc/ansible/playbooks/templates/hostname dest=/home/admin/testfile mode=0644
+    sudo: yes
+-------------------------------------------------------------------------------------
+# ansible-playbook create_template.yml 
+-------------------------------------------------------------------------------------
+На удаленном хосте по указанному нами пути появился файл со следующим содержимым:
+This is test file on test-1
+-------------------------------------------------------------------------------------
+    Примечание. Данный модуль также позволяет использовать функцию validate, которая
+проверяет файл перед его копированием на удаленный сервер
+-------------------------------------------------------------------------------------
+	Reboot remote host
+-------------------------------------------------------------------------------------
+---
+- hosts: test
+  become: yes
+  tasks:
+ 
+  - name: Reboot host
+    shell: sleep 2 && /sbin/shutdown -r now "Ansible system reboot"
+    async: 1
+    poll: 0
+  - name: Wait for the host to finish rebooting
+    local_action: wait_for host={{ inventory_hostname }} port=22 delay=20 connect_timeout=200
+    become: false
+    delegate_to: localhost
+-------------------------------------------------------------------------------------
+	Модуль action
+-------------------------------------------------------------------------------------
+В случае, когда нам нужно установить ПО на разные системы, у нас есть 2 пути:
+-------------------------------------------------------------------------------------
+1. Когда имена пакетов совпадают, тогда можно обойтись достаточно просто:
+	
+- name: Install wget
+  action: "{{ ansible_pkg_mgr }} name=wget state=present"
+-------------------------------------------------------------------------------------
+2. Когда имена пакетов не совпадают, тогда для каждой системы нужно будет заводить отдельную секцию:
+	
+- name: Install ntsysv package (CentOS)
+  yum: name=ntsysv state=latest
+  when: 'ansible_distribution' == 'CentOS'
+ 
+- name: Install gentoolkit package (Gentoo)
+  emerge: name=gentoolkit state=latest
+  when: 'ansible_distribution' == 'Gentoo'
+-------------------------------------------------------------------------------------
+- hosts: all
+  user: root
+ 
+  tasks:
+    - name: Add user
+      action: user name=korp password=XXX groups=wheel
+ 
+    - name: Add EPEL repo
+      yum: name=http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-2.noarch.rpm
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '7'
+ 
+    - name: Add RPMForge repo
+      yum: name=http://apt.sw.be/redhat/el7/en/x86_64/rpmforge/RPMS/rpmforge-release-0.5.3-1.el7.rf.x86_64.rpm
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '7'
+ 
+    - name: Add Remi repo
+      yum: name=http://rpms.famillecollet.com/enterprise/remi-release-7.rpm
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '7'
+       
+    - name: Add EPEL repo
+      yum: name=http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '6'
+ 
+    - name: Add Remi repo
+      yum: name=http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+      when: ansible_distribution == 'CentOS' and ansible_distribution_major_version == '6'
+       
+    - name: Software install
+      action: "{{ansible_pkg_mgr}} name={{item}} state=present"
+      with_items:
+        - htop 
+        - mc 
+        - nano 
+        - wget 
+        - vim 
+        - openssh-clients 
+ 
+    - name: Install ntsysv package (CentOS)
+      yum: name=ntsysv state=latest
+      when: ansible_distribution == 'CentOS'
+     
+    - name: Install gentoolkit package (Gentoo)
+      portage: name=gentoolkit state=latest
+      when: ansible_distribution == 'Gentoo'
+         
+    - name: NTP daemon enable
+      service: name=ntpdate enabled=yes
+       
+    - name: Setup NTP daemon
+      template: src=ntpdate.j2 dest=/etc/ntp.conf owner=root group=root mode=0644
+       
+    - name: NTP daemon restart
+      service: name=ntpdate state=restarted
+       
+    - name: Disable SELinux 
+      selinux: state=disabled
+       
+    - name: PermitRootLoginSSH
+      lineinfile: dest=/etc/ssh/sshd_config regexp="^MaxSessions 10" insertafter="^#MaxSessions 10" line="PermitRootLogin no"
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+	8.3 user/become/sudo/selinux
+-------------------------------------------------------------------------------------
+	Модуль user
+-------------------------------------------------------------------------------------
+# touch useradd.yml
+-------------------------------------------------------------------------------------
+---
+- hosts: all
+  become: yes
+  tasks:
+ 
+  - name: Add user to remote hosts
+    user: name=admin groups=sudo shell=/bin/bash password=$6$KjyfytoJ$hoQdVIGcRZgje2HpHFf8ldvooLfY774SrEpHkADUf3d7uGBSwVLeMXsPIfb4l2TaXWvprMz868ZbH8HLaiDeh.
+ 
+  - name: Add SSH keys to remote hosts
+    authorized_key: user=admin key="{{ lookup('file', "/home/admin/Downloads/key.pub") }}"
+-------------------------------------------------------------------------------------
+указано, что для выполнения задач требуется эскалация привилегий (become: yes)
+-------------------------------------------------------------------------------------
+    Примечание. become используется начиная с версии Ansible 1.9, до этого для
+эскалации привилегий использовали sudo
+-------------------------------------------------------------------------------------
+Поле tasks: содержит имена задач (Add user to remote hosts и Add SSH keys to remote hosts),
+имена модулей, которые должны выполняться (user и authorized_key) и аргументы,
+необходимые для выполнения модуля (для первого это name, groups, shell, password,
+для второго — user, key).
+-------------------------------------------------------------------------------------
+	Модуль become
+-------------------------------------------------------------------------------------
+Пример
+-------------------------------------------------------------------------------------
+---
+- hosts: myservers                                                                                                                                                 
+  remote_user: myuser
+  become: yes 
+  become_user: root
+  become_method: sudo
+  tasks:
+  - name: create ansible user
+    user: 
+      name: ansible 
+      shell: /bin/bash 
+      home: /home/ansible 
+
+  - name: copy ssh pubkey to home directory
+    authorized_key: 
+      user: ansible 
+      key: "{{ lookup('file', './ansible_pubkey') }}"
+  
+  - name: adding ansible user to sudoers
+    lineinfile: 
+      dest: /etc/sudoers 
+      line: "ansible ALL=(ALL)       NOPASSWD: ALL" 
+      validate: 'visudo -cf %s'
+-------------------------------------------------------------------------------------
+ansible-playbook -i hosts add-ansible-user.yml -k
+-------------------------------------------------------------------------------------
+become_user set to user with desired privileges, the user you ‘become’, NOT the user
+you login as. Does NOT imply become: yes, to allow it to be set at host level.
+-------------------------------------------------------------------------------------
+ПОЛУЧИЛОСЬ!
+
+become_user: root
+-------------------------------------------------------------------------------------
+	Модуль sudo
+-------------------------------------------------------------------------------------
+Первый способ — отключить необходимость ввода пароля при использовании sudo.
+Делается это в конфигурационном файле /etc/sudoers, где нужно добавить
+(или раскомментировать) строку:
+-------------------------------------------------------------------------------------
+...
+%sudo ALL=(ALL:ALL) NOPASSWD: ALL
+...
+-------------------------------------------------------------------------------------
+Второй вариант — использовать дополнительные параметры при запуске набора инструкций.
+Чтобы Ansible в нужный момент попросил ввести sudo-пароль, в старых версиях (< 1.9)
+следует использовать параметр
+—ask-sudo-pass (или -K),
+ а в версии Ansible старше 1.9
+параметр
+--ask-become-pass, например:
+-------------------------------------------------------------------------------------
+# ansible-playbook playbooks/useradd.yml --ask-become-pass
+-------------------------------------------------------------------------------------
+Третий вариант — добавил буквально пару строк в инвентарном файле, теперь он выглядит
+следующим образом:
+-------------------------------------------------------------------------------------
+[all:vars]
+ansible_sudo_pass=VeryStrongPassword
+ 
+[webservers]
+web1
+web2
+web3
+ 
+[mailservers]
+mail1
+mail2
+mail3
+ 
+[database]
+db1
+db2
+ 
+[others]
+stat
+mars
+venus
+earth
+-------------------------------------------------------------------------------------
+Следует отметить, что переменную ansible_sudo_pass можно переопределять в нескольких местах:
+-------------------------------------------------------------------------------------
+
+    для каждого отдельного хоста в инвентарном файле inventory/inventoryname/hosts;
+    для группы хостов в инвентарном файле inventory/inventoryname/groups (как раз наш случай);
+    для группы хостов в файле групповых переменных group_vars/groupname/ansible.yml;
+    для группы хостов в файле групповых переменных в зашифрованном виде ansible-vault create group_vars/groupname/ansible.yml.
+
+-------------------------------------------------------------------------------------
+Если хочется еще больше «безопасности» и зашифрованный пароль, то следует использовать ansible-vault. 
+-------------------------------------------------------------------------------------
+Сначала создадим файл, в котором будет храниться пароль для получения привилегий суперпользователя:
+-------------------------------------------------------------------------------------
+# ansible-vault create secret
+-------------------------------------------------------------------------------------
+В созданный файл secret следует добавить строку вида:
+-------------------------------------------------------------------------------------
+ansible_sudo_pass: VeryStrongPassword
+-------------------------------------------------------------------------------------
+И, так как мы все равно не хотим вводить пароль при запуске плейбука
+(даже пароль ansible-vault), то создадим файл vault.txt
+(не забываем выставит корректные права доступа):
+-------------------------------------------------------------------------------------
+# touch vault.txt
+-------------------------------------------------------------------------------------
+В котором в текстовом виде запишем свой пароль от ansible-vault.
+-------------------------------------------------------------------------------------
+---
+- hosts: all
+  become: yes
+ 
+  vars_files:
+    - secret
+ 
+  tasks:
+  - name: Add user to remote hosts
+    user: name=admin groups=sudo shell=/bin/bash password=$7$ZIJUvGwr$empMJ4r1JUGcxmjxtTBfTpIdO95JBTJO2/BtD23F2Rfeg2rqN.8t1v3ePPXVl.W7yal2fvrtbJ0T18YwCXmbh0
+ 
+  - name: Add SSH keys to remote hosts
+    authorized_key: user=admin key="{{ lookup('file', "~/Downloads/key.pub") }}"
+-------------------------------------------------------------------------------------
+# ansible-playbook playbooks/useradd.yml --vault-password-file=vault.txt
+-------------------------------------------------------------------------------------
+	8.4 git/jenkins
+-------------------------------------------------------------------------------------
+- name: Deploy our awesome application
+      git: repo=https://github.com/leucos/ansible-tuto-demosite.git dest=/var/www/awesome-app
+      tags: deploy
+-------------------------------------------------------------------------------------
+$ ansible-playbook -i step-08/hosts -l host1.example.org step-08/apache.yml
+-------------------------------------------------------------------------------------
+Строка tags: deploy позволяет запустить определнную порцию плейбука. Допустим, вы
+запушили новую версию сайта. Вы хотите ускорить процесс и запустить только ту часть,
+которая ответственна за деплой. Это можно сделать с помощью тегов. Естественно,
+"deploy" — это просто строка, можно задавать любую. Давайте посмотрим, как это
+можно использовать:
+-------------------------------------------------------------------------------------
+$ ansible-playbook -i step-08/hosts -l host1.example.org step-08/apache.yml -t deploy
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------
