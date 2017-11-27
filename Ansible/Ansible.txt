@@ -31,13 +31,16 @@
 	7.10 Handlers
 	7.11 Фильтры Jinja2
 	7.12 Тесты Jinja2
+	7.13 Факты
+	7.14 Блоки
   8. Module
-	8.1 command/shell/script/raw/file/copy/cron/template/action
-	8.2 setup/yum/apt/fetch/mail
+	8.1 command/shell/script/raw/file/copy/cron/template/action/local_action
+	8.2 setup/yum/apt/fetch/mail/delegate_to/delegate_facts/run_once
 	8.3 user/become/sudo/selinux
 	8.4 git/jenkins
 	8.5 ios_facts/ios_command/ios_config/ntc_ansible/set_fact/snmp_fact
-
+	8.6  ignore_errors/fail/failed_when/changed_when/any_errors_fatal/
+	8.7 register/prompt
 -------------------------------------------------------------------------------------
 http://docs.ansible.com/ansible/latest/
 -------------------------------------------------------------------------------------
@@ -2478,13 +2481,13 @@ $ ansible-playbook 8_handlers.yml
 -------------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------------
-
+	7.13 Факты
 -------------------------------------------------------------------------------------
-
+http://docs.ansible.com/ansible/latest/playbooks_variables.html#information-discovered-from-systems-facts
 -------------------------------------------------------------------------------------
-
+	7.14 Блоки
 -------------------------------------------------------------------------------------
-
+http://docs.ansible.com/ansible/latest/playbooks_blocks.html
 -------------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------------
@@ -2811,6 +2814,10 @@ This is test file on test-1
        
     - name: PermitRootLoginSSH
       lineinfile: dest=/etc/ssh/sshd_config regexp="^MaxSessions 10" insertafter="^#MaxSessions 10" line="PermitRootLogin no"
+-------------------------------------------------------------------------------------
+	Модуль local_action:
+-------------------------------------------------------------------------------------
+
 -------------------------------------------------------------------------------------
 
 -------------------------------------------------------------------------------------

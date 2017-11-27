@@ -1,0 +1,48 @@
+﻿
+Inventory
+[test]
+test-1
+test-2
+
+[web]
+web1
+web2
+
+
+пингуем удаленные хосты:
+ansible test -m ping
+
+просмотрим информацию об использовании оперативной памяти на удаленных хостах:
+ansible test -a "free -h"
+
+Версия
+ansible-playbook --version
+
+Для проверки вносимых измененеий в файлы без их применнения:
+-С(--check) -D(--diff)
+ansible-playbook -C -D playbook.yml
+
+Фильтры по тегам и именам для выполннение конкретных задач на конкретных серверах:
+ansible-playbook -t packages -l web1 playbook.yml
+
+
+Узнать, на каких хостах будет происходить работа, можно командой:
+ansible-playbook <имя_набора_инструкций> --list-host
+
+Посмотреть переменные и их значения можно командой:
+ansible -m setup test
+
+Запустить только конкретную задачу из playbook можно командой:
+ansible-playbook debug.yml --step --start-at-task="Debug"
+
+Чтобы Ansible в нужный момент попросил ввести sudo-пароль:
+# ansible-playbook playbooks/useradd.yml --ask-become-pass
+
+Создадим файл, в котором будет храниться пароль для получения привилегий суперпользователя:
+# ansible-vault create secret
+
+не хотим вводить пароль при запуске плейбука (даже пароль ansible-vault), то создадим файл vault.txt
+# touch vault.txt
+
+Теперь можно запускать выполнение набора инструкций командой:
+ы# ansible-playbook playbooks/useradd.yml --vault-password-file=vault.txt

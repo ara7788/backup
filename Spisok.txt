@@ -16216,19 +16216,7 @@ OV/EV - проверяется организация
 1.один домен(site.com)
 2.wild card(*.site.com)
 3.multy domain(site1.com,site2.com,site3.com)
-1. Типы регистрируемых сертификатов
-DV
-	PositiveSSL
-	GeoTrust QuickSSL Premium
-	RapidSSL Wildcard
-OV
-	InstantSSL
-	Multi-Domain SSL
-	True BusinessID Wildcard
-EV
-	EV SSL
-	SSL Web Server with EV
-	EV Multi-Domain SSL
+
 
 Генератор https://ru.rx-support.net/tools/csr-generator
 
